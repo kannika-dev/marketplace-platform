@@ -12,20 +12,19 @@ import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
-import Orders from './pages/Orders';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
-import SellerProfile from './pages/SellerProfile'; // 👈 เพิ่ม Import หน้าโปรไฟล์ร้านค้าฝั่งลูกค้าสำหรับทุกคนเข้าดู
+import SellerProfile from './pages/SellerProfile';
 
-// 🌟 Buyer Dashboard Pages (เพิ่มเข้ามาใหม่ให้ครบถ้วน)
+// 🌟 Buyer Dashboard Pages (ใช้หน้าแดชบอร์ดผู้ซื้อรวมทุกแท็บแทน Orders เดิม)
 import BuyerDashboard from './pages/buyer/BuyerDashboard';
 
 // Seller Pages
 import SellerDashboard from './pages/seller/Dashboard';
 import AddProduct from './pages/seller/AddProduct';
 import ManageOrders from './pages/seller/ManageOrders';
-import ShopProfile from './pages/seller/ShopProfile'; // หน้าตั้งค่าร้านค้าของตัวผู้ขายเอง
+import ShopProfile from './pages/seller/ShopProfile';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -90,18 +89,26 @@ export const App = () => {
               <Route path="/" element={<Home />} />
               <Route path="/products" element={<Products />} />
               <Route path="/products/:id" element={<ProductDetail />} />
-              <Route path="/product/:id" element={<ProductDetail />} /> {/* รองรับทั้ง /products/ และ /product/ */}
+              <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/reset-password" element={<ResetPassword />} />
 
-              {/* 🌟 Public Seller / Shop Profile (ทุกคนสามารถกดเข้ามาดูหน้าร้านค้านั้นๆ ได้) */}
+              {/* Public Seller / Shop Profile */}
               <Route path="/seller/:id" element={<SellerProfile />} />
 
-              {/* Protected Buyer Routes */}
+              {/* Protected Buyer Routes (รวมทั้ง /buyer และ /orders ให้มาลงที่ BuyerDashboard) */}
               <Route
                 path="/buyer"
+                element={
+                  <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
+                    <BuyerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/orders"
                 element={
                   <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
                     <BuyerDashboard />
@@ -116,16 +123,8 @@ export const App = () => {
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/orders"
-                element={
-                  <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
-                    <Orders />
-                  </ProtectedRoute>
-                }
-              />
 
-              {/* Protected Seller Routes (/seller/dashboard, etc.) */}
+              {/* Protected Seller Routes */}
               <Route
                 path="/seller/dashboard"
                 element={
@@ -159,7 +158,7 @@ export const App = () => {
                 }
               />
 
-              {/* Protected Admin Routes (/admin/*) */}
+              {/* Protected Admin Routes */}
               <Route
                 path="/admin/dashboard"
                 element={
