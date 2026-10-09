@@ -59,6 +59,7 @@ export const getSellerReviews = async (req, res) => {
     const sellerId = req.user.id;
     const [reviews] = await pool.query(
       `SELECT r.id, r.product_id, r.buyer_id, r.rating, r.comment, r.created_at,
+              r.reply_text, r.replied_at,
               p.title AS product_name, p.image_url AS product_image,
               COALESCE(u.name, 'ลูกค้าทั่วไป') AS customer_name
        FROM reviews r
@@ -75,6 +76,58 @@ export const getSellerReviews = async (req, res) => {
     });
   } catch (error) {
     console.error('getSellerReviews Error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Reply to a specific product review (Seller Response Thread)
+ */
+export const replyToReview = async (req, res) => {
+  try {
+    const sellerId = req.user.id;
+    const { reviewId } = req.params;
+    const { reply_text } = req.body;
+
+    if (!reply_text || reply_text.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณาระบุข้อความตอบกลับ'
+      });
+    }
+
+    const [reviewCheck] = await pool.query(
+      `SELECT r.id FROM reviews r
+       JOIN products p ON r.product_id = p.id
+       WHERE r.id = ? AND p.seller_id = ?`,
+      [reviewId, sellerId]
+    );
+
+    if (reviewCheck.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'คุณไม่มีสิทธิ์ตอบกลับรีวิวนี้'
+      });
+    }
+
+    await pool.query(
+      `UPDATE reviews 
+       SET reply_text = ?, replied_at = NOW() 
+       WHERE id = ?`,
+      [reply_text.trim(), reviewId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'ตอบกลับรีวิวเรียบร้อยแล้ว',
+      data: {
+        review_id: reviewId,
+        reply_text: reply_text.trim(),
+        replied_at: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('replyToReview Error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

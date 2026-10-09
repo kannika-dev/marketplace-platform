@@ -7,7 +7,8 @@ import {
   updateCraftStatus,
   updateProduct,
   deleteProduct,
-  getSellerReviews // <--- เพิ่มตรงนี้
+  getSellerReviews,
+  replyToReview
 } from '../controllers/sellerController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
@@ -24,6 +25,7 @@ router.put('/products/:id', upload.single('image'), updateProduct);
 router.delete('/products/:id', deleteProduct);
 router.get('/orders', getSellerOrders);
 router.patch('/orders/:orderId/craft-status', updateCraftStatus);
-router.get('/reviews', getSellerReviews); // <--- เพิ่ม Route สำหรับดึงรีวิวตรงนี้
+router.get('/reviews', getSellerReviews);
+router.put('/reviews/:reviewId/reply', replyToReview);
 
 export default router;
