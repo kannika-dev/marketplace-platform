@@ -12,7 +12,8 @@ import {
   X,
   LogOut,
   ArrowRight,
-  Store // 👈 เพิ่มไอคอน Store สำหรับปุ่มโปรไฟล์ร้านค้า
+  Store,
+  PackageOpen // 👈 เพิ่มไอคอนสำหรับแดชบอร์ดผู้ซื้อ
 } from 'lucide-react';
 import Badge from './Badge';
 
@@ -109,6 +110,17 @@ export const Navbar = () => {
             >
               Marketplace
             </Link>
+
+            {/* Buyer Dashboard Navigation (แสดงเมื่อเข้าสู่ระบบ) */}
+            {user && (
+              <Link
+                to="/buyer"
+                className="flex items-center gap-1.5 text-stone-800 hover:text-[#2A9D8F] transition-colors py-1"
+              >
+                <PackageOpen className="w-3.5 h-3.5 text-[#2A9D8F]" />
+                แดชบอร์ดผู้ซื้อ
+              </Link>
+            )}
 
             {/* Seller Navigation */}
             {role === 'seller' && (
@@ -290,6 +302,16 @@ export const Navbar = () => {
           >
             Handmade Lookbook
           </Link>
+
+          {user && (
+            <Link
+              to="/buyer"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-bold uppercase tracking-wider text-[#2A9D8F]"
+            >
+              🛍️ แดชบอร์ดผู้ซื้อ
+            </Link>
+          )}
 
           {/* Mobile Category Quick-Filter */}
           <div className="pt-2 border-t border-stone-200 space-y-1">

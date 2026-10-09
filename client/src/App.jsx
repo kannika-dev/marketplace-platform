@@ -18,6 +18,9 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import SellerProfile from './pages/SellerProfile'; // 👈 เพิ่ม Import หน้าโปรไฟล์ร้านค้าฝั่งลูกค้าสำหรับทุกคนเข้าดู
 
+// 🌟 Buyer Dashboard Pages (เพิ่มเข้ามาใหม่ให้ครบถ้วน)
+import BuyerDashboard from './pages/buyer/BuyerDashboard';
+
 // Seller Pages
 import SellerDashboard from './pages/seller/Dashboard';
 import AddProduct from './pages/seller/AddProduct';
@@ -97,6 +100,14 @@ export const App = () => {
               <Route path="/seller/:id" element={<SellerProfile />} />
 
               {/* Protected Buyer Routes */}
+              <Route
+                path="/buyer"
+                element={
+                  <ProtectedRoute allowedRoles={['buyer', 'seller', 'admin']}>
+                    <BuyerDashboard />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/checkout"
                 element={
