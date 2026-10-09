@@ -5,7 +5,7 @@ import api from '../../services/api';
 import ImageUploadDropzone from '../../components/common/ImageUploadDropzone';
 import {
   DollarSign, ShoppingBag, Package, Hammer,
-  TrendingUp, Plus, CheckCircle, Clock, Store, Loader2, AlertCircle
+  TrendingUp, Plus, CheckCircle, Clock, Store, Loader2, AlertCircle, MessageSquare
 } from 'lucide-react';
 
 function Dashboard() {
@@ -15,6 +15,7 @@ function Dashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [reviews, setReviews] = useState([]); // State สำหรับเก็บข้อมูลรีวิว
   const [shopInfo, setShopInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -33,11 +34,12 @@ function Dashboard() {
 
     setLoading(true);
     try {
-      const [analyticsRes, productsRes, ordersRes, shopRes] = await Promise.allSettled([
+      const [analyticsRes, productsRes, ordersRes, shopRes, reviewsRes] = await Promise.allSettled([
         api.get(`/shops/analytics/${currentUser.id}`),
         api.get(`/seller/products`),
         api.get(`/orders/seller/${currentUser.id}`),
-        api.get(`/shops/seller/${currentUser.id}`)
+        api.get(`/shops/seller/${currentUser.id}`),
+        api.get(`/seller/reviews`) // ดึงข้อมูลรีวิวของร้านค้า
       ]);
 
       if (analyticsRes.status === 'fulfilled') {
@@ -55,6 +57,10 @@ function Dashboard() {
       if (shopRes.status === 'fulfilled') {
         const body = shopRes.value?.data;
         setShopInfo(body ?? null);
+      }
+      if (reviewsRes.status === 'fulfilled') {
+        const body = reviewsRes.value?.data;
+        setReviews(Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : []);
       }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -94,22 +100,18 @@ function Dashboard() {
     const formElement = e.currentTarget;
     const formData = new FormData(formElement);
 
-    // ลบ input name="image" จาก form แบบเก่าออกเพื่อไม่ให้ส่ง empty file
     formData.delete('image');
 
-    // ถ้าผู้ใช้เลือกรูปใหม่ผ่าน Drag & Drop / File Selector ให้ส่งไฟล์นั้นไป
     if (editImageFile) {
       formData.append('image', editImageFile);
     }
 
-    // จัดการค่า checkbox ให้ส่ง '1' หรือ '0' ชัดเจน
     const isMadeToOrderInput = formElement.elements['is_made_to_order'];
     formData.set('is_made_to_order', isMadeToOrderInput && isMadeToOrderInput.checked ? '1' : '0');
 
     const supportsCustInput = formElement.elements['supports_customization'];
     formData.set('supports_customization', supportsCustInput && supportsCustInput.checked ? '1' : '0');
 
-    // ซิงค์ stock_quantity กับ stock
     const stockVal = formData.get('stock_quantity') || '0';
     formData.set('stock_quantity', stockVal);
     formData.set('stock', stockVal);
@@ -208,8 +210,8 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* 4 Cards ด้านบน */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* การ์ดสถิติด้านบน (เพิ่มการ์ดรีวิว) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div
           onClick={() => setActiveTab('revenue')}
           className={`p-5 rounded-2xl border cursor-pointer transition-all ${activeTab === 'revenue' ? 'ring-2 ring-emerald-800 bg-emerald-50/80 border-emerald-300 shadow-md' : 'bg-white hover:bg-stone-50 border-stone-200'}`}
@@ -259,6 +261,18 @@ function Dashboard() {
           </span>
           <span className="text-[11px] text-purple-700 font-medium">ชิ้นงาน Handcrafted</span>
         </div>
+
+        <div
+          onClick={() => setActiveTab('reviews')}
+          className={`p-5 rounded-2xl border cursor-pointer transition-all ${activeTab === 'reviews' ? 'ring-2 ring-amber-600 bg-amber-50/80 border-amber-300 shadow-md' : 'bg-white hover:bg-stone-50 border-stone-200'}`}
+        >
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs font-bold text-stone-600">รีวิวและความคิดเห็น</span>
+            <div className="p-2 rounded-xl bg-amber-100 text-amber-800"><MessageSquare className="w-5 h-5" /></div>
+          </div>
+          <span className="text-2xl font-extrabold text-stone-900 block">{reviews.length} รีวิว</span>
+          <span className="text-[11px] text-amber-700 font-medium">ฟีดแบ็กจากลูกค้า</span>
+        </div>
       </div>
 
       {/* ส่วนเนื้อหา TAB */}
@@ -291,7 +305,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* TAB 2: รายการสินค้า (คลิกเพื่อแก้ไข) */}
+        {/* TAB: รายการสินค้า (คลิกเพื่อแก้ไข) */}
         {activeTab === 'products' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -400,6 +414,53 @@ function Dashboard() {
                 ))
               )}
             </div>
+          </div>
+        )}
+
+        {/* TAB: รีวิวและความคิดเห็นจากลูกค้า */}
+        {activeTab === 'reviews' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold flex items-center gap-2 text-stone-900">
+                <MessageSquare className="w-5 h-5 text-amber-600" /> รีวิวและความคิดเห็นจากลูกค้า
+              </h3>
+              <span className="text-xs text-stone-400">รวมทั้งหมด {reviews.length} รายการ</span>
+            </div>
+
+            {reviews.length === 0 ? (
+              <div className="text-center py-12 bg-stone-50 rounded-2xl border border-dashed border-stone-300 space-y-3">
+                <MessageSquare className="w-12 h-12 text-stone-300 mx-auto" />
+                <p className="text-stone-500 font-medium">ยังไม่มีรีวิวจากลูกค้าในขณะนี้</p>
+                <p className="text-xs text-stone-400">เมื่อลูกค้าได้รับสินค้าและให้คะแนน จะแสดงผลที่นี่ทันที</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {reviews.map((rev) => (
+                  <div key={rev.id} className="p-4 border border-stone-200 rounded-xl bg-stone-50/50 flex flex-col sm:flex-row gap-4 items-start justify-between">
+                    <div className="flex gap-4 items-start">
+                      <img
+                        src={rev.product_image || 'https://via.placeholder.com/80'}
+                        alt={rev.product_name}
+                        className="w-16 h-16 object-cover rounded-lg border border-stone-200 flex-shrink-0"
+                      />
+                      <div>
+                        <h4 className="font-bold text-sm text-stone-800">{rev.product_name}</h4>
+                        <div className="flex items-center gap-1 my-1">
+                          {[...Array(5)].map((_, i) => (
+                            <span key={i} className={`text-sm ${i < rev.rating ? 'text-amber-400' : 'text-stone-300'}`}>★</span>
+                          ))}
+                          <span className="text-xs text-stone-500 ml-2">โดย {rev.customer_name || 'ลูกค้าผู้ซื้อ'}</span>
+                        </div>
+                        <p className="text-sm text-stone-600 mt-1">"{rev.comment || 'ไม่มีข้อความรีวิว'}"</p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-stone-400 self-end sm:self-start">
+                      {new Date(rev.created_at).toLocaleDateString('th-TH')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

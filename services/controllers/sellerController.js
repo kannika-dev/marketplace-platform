@@ -52,6 +52,34 @@ export const getSellerDashboardStats = async (req, res) => {
 };
 
 /**
+ * Get all reviews for products belonging to this seller
+ */
+export const getSellerReviews = async (req, res) => {
+  try {
+    const sellerId = req.user.id;
+    const [reviews] = await pool.query(
+      `SELECT r.id, r.product_id, r.buyer_id, r.rating, r.comment, r.created_at,
+              p.title AS product_name, p.image_url AS product_image,
+              u.name AS customer_name
+       FROM reviews r
+       JOIN products p ON r.product_id = p.id
+       JOIN users u ON r.buyer_id = u.id
+       WHERE p.seller_id = ?
+       ORDER BY r.created_at DESC`,
+      [sellerId]
+    );
+
+    return res.json({
+      success: true,
+      data: reviews
+    });
+  } catch (error) {
+    console.error('getSellerReviews Error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * Helper to safely parse boolean inputs from JSON or FormData strings
  */
 const parseBoolean = (val, defaultVal = 0) => {
@@ -68,7 +96,6 @@ const parseBoolean = (val, defaultVal = 0) => {
 
 /**
  * Helper to resolve or create a category by name or numeric ID
- * Supports categories: id, name, slug
  */
 const resolveCategoryId = async (connection, rawCategory, fallbackId = null) => {
   if (rawCategory === undefined || rawCategory === null || rawCategory === '') {
@@ -78,7 +105,6 @@ const resolveCategoryId = async (connection, rawCategory, fallbackId = null) => 
   const strCategory = String(rawCategory).trim();
   if (!strCategory) return fallbackId;
 
-  // 1. หากส่งมาเป็นตัวเลขล้วน (เช่น 5 หรือ "5")
   const parsedId = parseInt(strCategory, 10);
   const isPureNumber = !isNaN(parsedId) && String(parsedId) === strCategory;
 
@@ -98,10 +124,8 @@ const resolveCategoryId = async (connection, rawCategory, fallbackId = null) => 
     }
   }
 
-  // 2. หากส่งมาเป็นชื่อข้อความ (เช่น "เทียนหอม" หรือ "เซรามิก")
   const catName = strCategory;
   try {
-    // 2.1 ค้นหาชื่อที่ตรงกันเป๊ะก่อน (Case-insensitive)
     const [exactMatch] = await connection.query(
       'SELECT id FROM categories WHERE LOWER(TRIM(name)) = LOWER(?) LIMIT 1',
       [catName]
@@ -110,7 +134,6 @@ const resolveCategoryId = async (connection, rawCategory, fallbackId = null) => 
       return exactMatch[0].id;
     }
 
-    // 2.2 ค้นหาด้วย LIKE
     const [likeMatch] = await connection.query(
       'SELECT id FROM categories WHERE name LIKE ? LIMIT 1',
       [`%${catName}%`]
@@ -119,7 +142,6 @@ const resolveCategoryId = async (connection, rawCategory, fallbackId = null) => 
       return likeMatch[0].id;
     }
 
-    // 2.3 หากยังไม่มี ให้สร้างหมวดหมู่ใหม่พร้อม slug ไม่ซ้ำ
     let baseSlug = catName
       .toLowerCase()
       .replace(/[^\w\u0E00-\u0E7F]+/g, '-')
@@ -150,7 +172,7 @@ const resolveCategoryId = async (connection, rawCategory, fallbackId = null) => 
 };
 
 /**
- * Add a new product (Minimal required: Title & Price only)
+ * Add a new product
  */
 export const addProduct = async (req, res) => {
   if (!req.user || !req.user.id) {
@@ -196,7 +218,6 @@ export const addProduct = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. ระบุ category_id
     const rawCategory = category_id !== undefined && category_id !== '' ? category_id : category;
     let validCategoryId = await resolveCategoryId(connection, rawCategory, null);
 
@@ -209,7 +230,6 @@ export const addProduct = async (req, res) => {
       }
     }
 
-    // 2. จัดการรูปภาพ (Cloudinary หรือ URL ที่ส่งมา)
     let imageUrl = null;
     if (req.file) {
       imageUrl = getSecureCloudinaryUrl(req.file);
@@ -217,7 +237,6 @@ export const addProduct = async (req, res) => {
       imageUrl = req.body.image_url.trim();
     }
 
-    // 3. ปรับค่าฟิลด์ให้ตรงกับ schema ตาราง products
     const rawStock = stock_quantity !== undefined && stock_quantity !== '' ? stock_quantity : stock;
     const finalStockQuantity = (rawStock !== undefined && rawStock !== null && rawStock !== '' && !isNaN(Number(rawStock)))
       ? Math.max(0, parseInt(rawStock, 10))
@@ -254,7 +273,6 @@ export const addProduct = async (req, res) => {
       finalSupportsCustomization = 1;
     }
 
-    // 4. บันทึกสินค้าลงตาราง products
     const [productResult] = await connection.query(
       `INSERT INTO products (
         seller_id, category_id, title, description, price, stock_quantity,
@@ -276,7 +294,6 @@ export const addProduct = async (req, res) => {
 
     const productId = productResult.insertId;
 
-    // 5. บันทึกตัวเลือก product_options
     if (Array.isArray(parsedOptions) && parsedOptions.length > 0) {
       for (const opt of parsedOptions) {
         if (opt && opt.title && opt.title.trim()) {
@@ -298,7 +315,6 @@ export const addProduct = async (req, res) => {
       }
     }
 
-    // 6. บันทึก product_customizations
     if (Array.isArray(parsedCustomizations) && parsedCustomizations.length > 0) {
       for (const cust of parsedCustomizations) {
         const optName = cust.option_name || cust.name || cust.title;
@@ -366,7 +382,7 @@ export const getSellerProducts = async (req, res) => {
 };
 
 /**
- * Update an existing product (Owner check enforced & safe transaction)
+ * Update an existing product
  */
 export const updateProduct = async (req, res) => {
   const { id } = req.params;
@@ -392,7 +408,6 @@ export const updateProduct = async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // 1. ตรวจสอบว่าสินค้ามีอยู่และเป็นของ seller รายนี้จริง
     const [existing] = await connection.query(
       'SELECT * FROM products WHERE id = ?',
       [productId]
@@ -432,7 +447,6 @@ export const updateProduct = async (req, res) => {
       product_customizations
     } = req.body;
 
-    // 2. จัดการรูปภาพ (Cloudinary หรือ URL ที่ส่งมา ถ้าไม่ส่งให้ใช้ภาพเดิม)
     let imageUrl = current.image_url;
     if (req.file) {
       imageUrl = getSecureCloudinaryUrl(req.file);
@@ -440,11 +454,9 @@ export const updateProduct = async (req, res) => {
       imageUrl = req.body.image_url.trim();
     }
 
-    // 3. จัดการหมวดหมู่สินค้าผ่าน resolveCategoryId (รองรับทั้งชื่อข้อความ เช่น 'เทียนหอม' หรือตัวเลข category_id)
     const rawCategory = category_id !== undefined && category_id !== '' ? category_id : category;
     const resolvedCategoryId = await resolveCategoryId(connection, rawCategory, current.category_id);
 
-    // 4. ตรวจสอบและแปลงประเภทข้อมูลทุกฟิลด์ให้ถูกต้อง ป้องกัน Error 500
     const newTitle = (title !== undefined && title !== null && String(title).trim() !== '')
       ? String(title).trim()
       : current.title;
@@ -490,7 +502,6 @@ export const updateProduct = async (req, res) => {
       ? parseBoolean(supports_customization, current.supports_customization ? 1 : 0)
       : (current.supports_customization ? 1 : 0);
 
-    // 5. อัปเดตข้อมูลตาราง products
     await connection.query(
       `UPDATE products SET 
         title = ?,
@@ -518,7 +529,6 @@ export const updateProduct = async (req, res) => {
       ]
     );
 
-    // 6. อัปเดต options หากมีส่งมา
     if (options !== undefined) {
       let parsedOptions = [];
       try {
@@ -545,7 +555,6 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // 7. อัปเดต customizations หากมีส่งมา
     const rawCust = customizations !== undefined ? customizations : product_customizations;
     if (rawCust !== undefined) {
       let parsedCustomizations = [];
@@ -578,7 +587,6 @@ export const updateProduct = async (req, res) => {
       }
     }
 
-    // 8. ดึงข้อมูลสินค้าที่อัปเดตล่าสุด
     const [updatedRows] = await connection.query(
       `SELECT
          p.id, p.seller_id, p.category_id, p.title, p.description,
@@ -611,7 +619,7 @@ export const updateProduct = async (req, res) => {
 };
 
 /**
- * Delete a product (Owner check enforced & safe transaction)
+ * Delete a product
  */
 export const deleteProduct = async (req, res) => {
   const { id } = req.params;
@@ -660,7 +668,7 @@ export const deleteProduct = async (req, res) => {
 
     try {
       await connection.query('DELETE FROM product_customizations WHERE product_id = ?', [productId]);
-    } catch (ignoreCustErr) {}
+    } catch (ignoreCustErr) { }
 
     await connection.query('DELETE FROM product_options WHERE product_id = ?', [productId]);
     await connection.query('DELETE FROM products WHERE id = ?', [productId]);
