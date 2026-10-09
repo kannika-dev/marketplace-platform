@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // ดึง VITE_API_URL มาใช้ ถ้านึกไม่ออกให้กลับไปใช้ localhost:5000[cite: 9]
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://marketplace-backend-tqqg.onrender.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://marketplace-platform-xh1q.onrender.com';
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
