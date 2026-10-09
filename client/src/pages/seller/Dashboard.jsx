@@ -5,7 +5,7 @@ import api from '../../services/api';
 import ImageUploadDropzone from '../../components/common/ImageUploadDropzone';
 import {
   DollarSign, ShoppingBag, Package, Hammer,
-  TrendingUp, Plus, CheckCircle, Clock, Store, Loader2, AlertCircle, MessageSquare
+  TrendingUp, Plus, CheckCircle, Clock, Store, Loader2, AlertCircle, MessageSquare, Send, Sparkles
 } from 'lucide-react';
 
 function Dashboard() {
@@ -25,6 +25,11 @@ function Dashboard() {
   const [updatingProduct, setUpdatingProduct] = useState(false);
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
+
+  // State สำหรับจัดการ Modal สนทนาตอบกลับรีวิว
+  const [activeReviewModal, setActiveReviewModal] = useState(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
 
   const fetchDashboardData = async () => {
     if (!currentUser?.id) {
@@ -145,6 +150,43 @@ function Dashboard() {
       fetchDashboardData();
     } catch (err) {
       alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการลบสินค้า');
+    }
+  };
+
+  // ฟังก์ชันส่งข้อความตอบกลับรีวิว
+  const handleSendReviewReply = async (e) => {
+    e.preventDefault();
+    if (!activeReviewModal || !replyMessage.trim()) return;
+
+    setSendingReply(true);
+    try {
+      await api.put(`/seller/reviews/${activeReviewModal.id}/reply`, {
+        reply_text: replyMessage.trim()
+      });
+
+      // อัปเดตข้อมูลใน State ทันทีเพื่อให้แสดงผลสอดคล้องกัน
+      setReviews(prevReviews =>
+        prevReviews.map(r =>
+          r.id === activeReviewModal.id
+            ? { ...r, reply_text: replyMessage.trim(), replied_at: new Date().toISOString() }
+            : r
+        )
+      );
+
+      setActiveReviewModal(prev => ({
+        ...prev,
+        reply_text: replyMessage.trim(),
+        replied_at: new Date().toISOString()
+      }));
+
+      setReplyMessage('');
+      alert('ตอบกลับรีวิวเรียบร้อยแล้วจ้า!');
+      fetchDashboardData();
+    } catch (err) {
+      console.error('Reply review error:', err);
+      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการตอบกลับรีวิว');
+    } finally {
+      setSendingReply(false);
     }
   };
 
@@ -417,7 +459,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* TAB: รีวิวและความคิดเห็นจากลูกค้า */}
+        {/* TAB: รีวิวและความคิดเห็นจากลูกค้า (พร้อมปุ่มเปิด Thread สนทนา และจุดแจ้งเตือนสีแดง) */}
         {activeTab === 'reviews' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -435,36 +477,155 @@ function Dashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {reviews.map((rev) => (
-                  <div key={rev.id} className="p-4 border border-stone-200 rounded-xl bg-stone-50/50 flex flex-col sm:flex-row gap-4 items-start justify-between">
-                    <div className="flex gap-4 items-start">
-                      <img
-                        src={rev.product_image || 'https://via.placeholder.com/80'}
-                        alt={rev.product_name}
-                        className="w-16 h-16 object-cover rounded-lg border border-stone-200 flex-shrink-0"
-                      />
-                      <div>
-                        <h4 className="font-bold text-sm text-stone-800">{rev.product_name}</h4>
-                        <div className="flex items-center gap-1 my-1">
-                          {[...Array(5)].map((_, i) => (
-                            <span key={i} className={`text-sm ${i < rev.rating ? 'text-amber-400' : 'text-stone-300'}`}>★</span>
-                          ))}
-                          <span className="text-xs text-stone-500 ml-2">โดย {rev.customer_name || 'ลูกค้าผู้ซื้อ'}</span>
+                {reviews.map((rev) => {
+                  const hasReplied = Boolean(rev.reply_text);
+                  return (
+                    <div key={rev.id} className="p-4 border border-stone-200 rounded-xl bg-stone-50/50 flex flex-col sm:flex-row gap-4 items-start justify-between">
+                      <div className="flex gap-4 items-start">
+                        <img
+                          src={rev.product_image || 'https://via.placeholder.com/80'}
+                          alt={rev.product_name}
+                          className="w-16 h-16 object-cover rounded-lg border border-stone-200 flex-shrink-0"
+                        />
+                        <div>
+                          <h4 className="font-bold text-sm text-stone-800">{rev.product_name}</h4>
+                          <div className="flex items-center gap-1 my-1">
+                            {[...Array(5)].map((_, i) => (
+                              <span key={i} className={`text-sm ${i < rev.rating ? 'text-amber-400' : 'text-stone-300'}`}>★</span>
+                            ))}
+                            <span className="text-xs text-stone-500 ml-2">โดย {rev.customer_name || 'ลูกค้าผู้ซื้อ'}</span>
+                          </div>
+                          <p className="text-sm text-stone-600 mt-1">"{rev.comment || 'ไม่มีข้อความรีวิว'}"</p>
+
+                          {/* ปุ่มเปิดกล่องสนทนา (พร้อมจุดแจ้งเตือนสีแดงถ้ายังไม่ตอบกลับ) */}
+                          <div className="mt-3">
+                            <button
+                              onClick={() => {
+                                setActiveReviewModal(rev);
+                                setReplyMessage('');
+                              }}
+                              className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-stone-100 border border-stone-300 rounded-lg text-xs font-bold text-stone-700 shadow-2xs transition-all"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 text-emerald-800" />
+                              <span>ดูการสนทนา / ตอบกลับ</span>
+                              {!hasReplied && (
+                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white animate-pulse" title="ยังไม่ได้ตอบกลับ" />
+                              )}
+                              {hasReplied && (
+                                <span className="ml-1 px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] rounded-md font-medium">ตอบแล้ว</span>
+                              )}
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-sm text-stone-600 mt-1">"{rev.comment || 'ไม่มีข้อความรีวิว'}"</p>
                       </div>
+                      <span className="text-xs text-stone-400 self-end sm:self-start">
+                        {new Date(rev.created_at).toLocaleDateString('th-TH')}
+                      </span>
                     </div>
-                    <span className="text-xs text-stone-400 self-end sm:self-start">
-                      {new Date(rev.created_at).toLocaleDateString('th-TH')}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
       </div>
+
+      {/* --- MODAL สนทนาตอบกลับรีวิว (Thread Conversation Modal) --- */}
+      {activeReviewModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-emerald-800" />
+                <h3 className="text-lg font-bold text-stone-900">สนทนากับลูกค้า (รีวิวสินค้า)</h3>
+              </div>
+              <button onClick={() => setActiveReviewModal(null)} className="text-stone-400 hover:text-stone-700 font-bold text-lg">✕</button>
+            </div>
+
+            {/* ส่วนแสดงประวัติการสนทนา (Thread Messages) */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 max-h-[50vh]">
+              {/* ข้อความฝั่งลูกค้า */}
+              <div className="flex gap-3 items-start bg-stone-50 p-3.5 rounded-xl border border-stone-200">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                  {activeReviewModal.customer_name ? activeReviewModal.customer_name.charAt(0) : 'ล'}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-stone-900">{activeReviewModal.customer_name || 'ลูกค้า'}</span>
+                    <span className="text-[10px] text-stone-400">{new Date(activeReviewModal.created_at).toLocaleString('th-TH')}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {[...Array(5)].map((_, i) => (
+                      <span key={i} className={`text-xs ${i < activeReviewModal.rating ? 'text-amber-400' : 'text-stone-300'}`}>★</span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-stone-700 bg-white p-2.5 rounded-lg border border-stone-200 shadow-2xs inline-block">
+                    "{activeReviewModal.comment || 'ไม่มีข้อความรีวิว'}"
+                  </p>
+                </div>
+              </div>
+
+              {/* ข้อความฝั่งร้านค้า (ถ้ามีการตอบกลับแล้ว) */}
+              {activeReviewModal.reply_text ? (
+                <div className="flex gap-3 items-start bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 flex-row-reverse">
+                  <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
+                    ร้าน
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <div className="flex items-center gap-2 justify-end">
+                      <span className="text-[10px] text-stone-400">
+                        {activeReviewModal.replied_at ? new Date(activeReviewModal.replied_at).toLocaleString('th-TH') : 'เพิ่งตอบกลับ'}
+                      </span>
+                      <span className="font-bold text-xs text-emerald-900">สตูดิโอของคุณ (ร้านค้า)</span>
+                    </div>
+                    <p className="text-xs text-stone-700 bg-white p-2.5 rounded-lg border border-emerald-200 shadow-2xs inline-block text-left">
+                      {activeReviewModal.reply_text}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 bg-stone-50 rounded-xl border border-dashed border-stone-200 text-stone-400 text-xs">
+                  ยังไม่มีการตอบกลับจากร้านค้าในรีวิวนี้
+                </div>
+              )}
+            </div>
+
+            {/* ฟอร์มพิมพ์ข้อความตอบกลับใหม่ */}
+            <form onSubmit={handleSendReviewReply} className="space-y-3 pt-3 border-t">
+              <div>
+                <label className="block text-xs font-bold text-stone-700 mb-1">พิมพ์ข้อความตอบกลับลูกค้า</label>
+                <textarea
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  placeholder="เขียนข้อความขอบคุณหรือชี้แจงลูกค้า..."
+                  rows="3"
+                  required
+                  className="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-emerald-800 outline-none resize-none"
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveReviewModal(null)}
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl"
+                >
+                  ปิดหน้าต่าง
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendingReply || !replyMessage.trim()}
+                  className="px-5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {sendingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  <span>{sendingReply ? 'กำลังส่ง...' : 'ส่งคำตอบกลับ'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* --- MODAL แก้ไขสินค้า --- */}
       {selectedProduct && (
