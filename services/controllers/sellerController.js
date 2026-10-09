@@ -52,7 +52,7 @@ export const getSellerDashboardStats = async (req, res) => {
 };
 
 /**
- * Get all reviews for products belonging to this seller
+ * Get all reviews for products belonging to this seller (Flexible LEFT JOIN)
  */
 export const getSellerReviews = async (req, res) => {
   try {
@@ -60,10 +60,10 @@ export const getSellerReviews = async (req, res) => {
     const [reviews] = await pool.query(
       `SELECT r.id, r.product_id, r.buyer_id, r.rating, r.comment, r.created_at,
               p.title AS product_name, p.image_url AS product_image,
-              u.name AS customer_name
+              COALESCE(u.name, 'ลูกค้าทั่วไป') AS customer_name
        FROM reviews r
        JOIN products p ON r.product_id = p.id
-       JOIN users u ON r.buyer_id = u.id
+       LEFT JOIN users u ON r.buyer_id = u.id
        WHERE p.seller_id = ?
        ORDER BY r.created_at DESC`,
       [sellerId]
