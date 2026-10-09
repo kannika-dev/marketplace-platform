@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background: #FAF9F5;
+    color: #1A1A1A;
+    font-family: 'Prompt', 'Kanit', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    letter-spacing: -0.01em;
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: 'Kanit', 'Prompt', sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Editorial Magazine Canvas */
+.editorial-canvas {
+  background-color: #FAF9F5;
+}
+
+/* High-Contrast Editorial Border */
+.editorial-border {
+  border-color: rgba(27, 67, 50, 0.12);
+}
+
+/* Runway Glass / Clay Cards */
+.runway-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(27, 67, 50, 0.08);
+  box-shadow: 
+    0 10px 30px -5px rgba(27, 67, 50, 0.05),
+    0 2px 6px -1px rgba(231, 111, 81, 0.03);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.runway-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 
+    0 24px 50px -10px rgba(27, 67, 50, 0.12),
+    0 8px 20px -4px rgba(231, 111, 81, 0.08);
+  border-color: rgba(27, 67, 50, 0.2);
+}
+
+/* Magazine Cover Shadow & Glass */
+.magazine-cover {
+  box-shadow: 
+    0 25px 60px -15px rgba(27, 67, 50, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+}
+
+/* Runway Primary Terracotta Button */
+.btn-runway-terracotta {
+  background: #E76F51;
+  color: #FFFFFF;
+  box-shadow: 0 10px 25px -5px rgba(231, 111, 81, 0.38);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-runway-terracotta:hover {
+  background: #D95D3F;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 16px 32px -6px rgba(231, 111, 81, 0.48);
+}
+
+.btn-runway-terracotta:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Deep Emerald Runway Button */
+.btn-runway-emerald {
+  background: #1B4332;
+  color: #F4F9F4;
+  box-shadow: 0 10px 25px -5px rgba(27, 67, 50, 0.35);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-runway-emerald:hover {
+  background: #2D6A4F;
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 16px 32px -6px rgba(27, 67, 50, 0.45);
+}
+
+/* Custom Scrollbar for Editorial Runway */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF9F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #D5C4B4;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #1B4332;
+}
