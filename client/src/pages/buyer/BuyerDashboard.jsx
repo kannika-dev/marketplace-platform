@@ -6,8 +6,7 @@ import {
     PackageCheck,
     History,
     BarChart3,
-    Sparkles,
-    Phone
+    Sparkles
 } from 'lucide-react';
 
 import ProfileTab from './tabs/ProfileTab';
@@ -20,7 +19,7 @@ import StatsTab from './tabs/StatsTab';
 export const BuyerDashboard = () => {
     const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
     const [activeTab, setActiveTab] = useState('profile');
-    const [refreshKey, setRefreshKey] = useState(0); // ตัวแปรสำหรับสั่งรีเฟรชข้อมูล sidebar ทันทีที่บันทึก
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const [buyerProfile, setBuyerProfile] = useState({
         name: 'กำลังโหลด...',
@@ -30,7 +29,7 @@ export const BuyerDashboard = () => {
         role: 'buyer'
     });
 
-    const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id') || '1';
+    // ฟังก์ชันดึง Token และแกะ userId จาก JWT Token โดยตรง
     const getStoredToken = () => {
         return localStorage.getItem('craft_token') ||
             localStorage.getItem('token') ||
@@ -38,7 +37,28 @@ export const BuyerDashboard = () => {
             localStorage.getItem('jwt') || '';
     };
 
+    const getUserIdFromToken = () => {
+        const token = getStoredToken();
+        if (token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                const decoded = JSON.parse(jsonPayload);
+                return decoded.id || decoded.userId || decoded.sub;
+            } catch (e) {
+                console.error('Failed to parse JWT token:', e);
+            }
+        }
+        return localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id');
+    };
+
+    const userId = getUserIdFromToken();
+
     const fetchDashboardProfile = async () => {
+        if (!userId) return;
         try {
             const token = getStoredToken();
             const headers = {};
@@ -64,12 +84,9 @@ export const BuyerDashboard = () => {
     };
 
     useEffect(() => {
-        if (userId) {
-            fetchDashboardProfile();
-        }
+        fetchDashboardProfile();
     }, [userId, refreshKey]);
 
-    // ฟังก์ชันสั่งอัปเดต Sidebar ทันทีหลังกดบันทึกสำเร็จในหน้า ProfileTab
     const handleProfileUpdated = () => {
         setRefreshKey(prev => prev + 1);
     };

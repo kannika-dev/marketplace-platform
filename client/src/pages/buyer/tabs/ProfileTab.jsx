@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileTab = ({ onProfileUpdated }) => {
-    // ใช้ลิงก์ Backend ตัวจริงของโปรเจกต์นี้ที่ถูกต้อง
     const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
 
     const [profile, setProfile] = useState({
@@ -29,10 +28,6 @@ export const ProfileTab = ({ onProfileUpdated }) => {
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
 
-    // ดึง userId จาก localStorage (รองรับหลายชื่อ key)
-    const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id') || '1';
-
-    // ฟังก์ชันดึง Token จาก localStorage (ดึง craft_token เป็นอันดับแรก)
     const getStoredToken = () => {
         return localStorage.getItem('craft_token') ||
             localStorage.getItem('token') ||
@@ -41,8 +36,30 @@ export const ProfileTab = ({ onProfileUpdated }) => {
             localStorage.getItem('userToken') || '';
     };
 
+    // ฟังก์ชันแกะ userId จาก JWT Token โดยตรง
+    const getUserIdFromToken = () => {
+        const token = getStoredToken();
+        if (token) {
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                const decoded = JSON.parse(jsonPayload);
+                return decoded.id || decoded.userId || decoded.sub;
+            } catch (e) {
+                console.error('Failed to parse JWT token:', e);
+            }
+        }
+        return localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id');
+    };
+
+    const userId = getUserIdFromToken();
+
     useEffect(() => {
         const fetchProfile = async () => {
+            if (!userId) return;
             try {
                 const token = getStoredToken();
                 const headers = {};
@@ -68,9 +85,7 @@ export const ProfileTab = ({ onProfileUpdated }) => {
             }
         };
 
-        if (userId) {
-            fetchProfile();
-        }
+        fetchProfile();
     }, [userId]);
 
     const handleChange = (e) => {
@@ -115,6 +130,11 @@ export const ProfileTab = ({ onProfileUpdated }) => {
         setErrorMsg('');
         setSuccessMsg('');
 
+        if (!userId) {
+            setErrorMsg('⚠️ ไม่พบรหัสผู้ใช้งาน กรุณาล็อกอินใหม่อีกครั้งค่ะ');
+            return;
+        }
+
         if (profile.role === 'buyer') {
             if (!profile.phone || !profile.address_no || !profile.province || !profile.zipcode) {
                 setErrorMsg('⚠️ สำหรับผู้ซื้อ (Buyer) กรุณากรอกเบอร์โทรศัพท์และที่อยู่จัดส่งให้ครบถ้วนเพื่อใช้สำหรับระบบ Auto-Fill ค่ะ');
@@ -157,7 +177,6 @@ export const ProfileTab = ({ onProfileUpdated }) => {
                 }
                 setSelectedFile(null);
 
-                // สั่งแจ้งเตือนให้ BuyerDashboard อัปเดตรูปและชื่อที่ Sidebar ด้านซ้ายทันที
                 if (onProfileUpdated) {
                     onProfileUpdated();
                 }
@@ -393,7 +412,6 @@ export const ProfileTab = ({ onProfileUpdated }) => {
                     </div>
                 </div>
 
-                {/* ปุ่มบันทึก */}
                 <div className="pt-6 border-t border-stone-100 flex justify-end pb-12">
                     <button
                         type="submit"
