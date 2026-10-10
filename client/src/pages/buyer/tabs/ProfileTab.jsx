@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileTab = () => {
-    // โครงสร้าง state สอดคล้องกับตาราง users (รวม avatar_url)
+    // เคลียร์ค่าเริ่มต้นใน state ให้ว่างเปล่าเพื่อรอรับข้อมูลจริงจากฐานข้อมูลและทดสอบกรอก
     const [profile, setProfile] = useState({
         name: '',
         email: '',
