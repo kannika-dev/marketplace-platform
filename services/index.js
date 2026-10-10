@@ -13,7 +13,7 @@ import sellerRoutes from './routes/sellerRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
-import buyerRoutes from './routes/buyerRoutes.js'; // นำเข้าเส้นทาง Buyer ที่สร้างขึ้นใหม่
+import buyerRoutes from './routes/buyerRoutes.js';
 
 dotenv.config();
 
@@ -24,6 +24,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 const allowedOrigins = [
+  'https://marketplace-platform-handcrafted.netlify.app',
   'https://marketplace-handmade-craft.netlify.app',
   'http://localhost:5173',
   'http://localhost:3000'
@@ -89,7 +90,6 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // สร้างตาราง users พร้อมฟิลด์โปรไฟล์และ avatar_url ครบถ้วน
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -114,7 +114,6 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // Migration helper สำหรับเติมคอลัมน์ในตาราง users อัตโนมัติกรณีตารางเดิมมีอยู่แล้ว
     try {
       const [existingUserCols] = await pool.query(
         `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND TABLE_SCHEMA = DATABASE()`
@@ -280,7 +279,6 @@ const initDatabaseSchema = async () => {
   }
 };
 
-// Mount API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
@@ -288,7 +286,7 @@ app.use('/api/seller', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/shops', shopRoutes);
-app.use('/api/buyer', buyerRoutes); // ประกาศใช้งานเส้นทาง Buyer API ที่นี่
+app.use('/api/buyer', buyerRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);
