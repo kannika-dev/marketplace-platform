@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileTab = () => {
-    // สมมติข้อมูลผู้ใช้จำลอง (เวลาใช้งานจริงดึงมาจาก State หลักหรือ API ของตาราง users)
+    // โครงสร้าง state สอดคล้องกับคอลัมน์ในตาราง users จริง (รวม avatar_url)
     const [profile, setProfile] = useState({
         name: 'กานต์ดา มั่งคั่ง',
         email: 'kanda.craft@gmail.com',
         role: 'buyer', // 'buyer' หรือ 'admin' หรือ 'seller'
+        avatar_url: '', // ตรงกับคอลัมน์ใหม่ในฐานข้อมูล
         phone: '',
         address_no: '',
         subdistrict: '',
@@ -18,8 +19,13 @@ export const ProfileTab = () => {
         line_id: ''
     });
 
+    // กำหนดรูปเริ่มต้น (Fall-back หาก avatar_url เป็นค่าว่าง NULL)
+    const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
+    const [previewAvatar, setPreviewAvatar] = useState(profile.avatar_url || defaultAvatar);
+
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
+    const fileInputRef = useRef(null);
 
     // ฟังก์ชันอัปเดตค่าในฟอร์ม
     const handleChange = (e) => {
@@ -28,6 +34,37 @@ export const ProfileTab = () => {
             ...prev,
             [name]: value
         }));
+    };
+
+    // ฟังก์ชันจัดการเมื่อเลือกไฟล์รูปจากเครื่อง (แปลงเป็น Object URL สำหรับพรีวิว)
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            if (!file.type.startsWith('image/')) {
+                setErrorMsg('⚠️ กรุณาเลือกไฟล์รูปภาพเท่านั้นค่ะ');
+                return;
+            }
+            const imageUrl = URL.createObjectURL(file);
+            setPreviewAvatar(imageUrl);
+            setProfile(prev => ({ ...prev, avatar_url: imageUrl }));
+            setErrorMsg('');
+        }
+    };
+
+    // รองรับการลากไฟล์มาวาง (Drag & Drop)
+    const handleDrop = (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            const imageUrl = URL.createObjectURL(file);
+            setPreviewAvatar(imageUrl);
+            setProfile(prev => ({ ...prev, avatar_url: imageUrl }));
+            setErrorMsg('');
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
     };
 
     // ฟังก์ชันกดบันทึกพร้อมเช็กเงื่อนไขบังคับเฉพาะ Buyer
@@ -44,9 +81,9 @@ export const ProfileTab = () => {
             }
         }
 
-        // จำลองการบันทึกข้อมูลลงตาราง users สำเร็จ
-        console.log('Saving to users table:', profile);
-        setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์สำเร็จเรียบร้อยแล้ว!');
+        // จำลองการส่งข้อมูลไปบันทึกที่ตาราง users ใน Database
+        console.log('Saving to users table fields:', profile);
+        setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ในตาราง users สำเร็จเรียบร้อยแล้ว!');
     };
 
     return (
@@ -63,7 +100,7 @@ export const ProfileTab = () => {
 
             {/* แจ้งเตือนข้อผิดพลาด (ถ้ามี) */}
             {errorMsg && (
-                <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-2 shadow-sm animate-shake">
+                <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-2 shadow-sm">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{errorMsg}</span>
                 </div>
@@ -76,6 +113,45 @@ export const ProfileTab = () => {
                     <span>{successMsg}</span>
                 </div>
             )}
+
+            {/* ส่วนอัปโหลดและลากวางรูปภาพโปรไฟล์ (เก็บบันทึกลงฟิลด์ avatar_url) */}
+            <div className="p-5 bg-emerald-50/40 rounded-3xl border-2 border-dashed border-emerald-200 flex flex-col sm:flex-row items-center gap-6">
+                <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-md flex-shrink-0 bg-stone-100">
+                    <img src={previewAvatar || defaultAvatar} alt="Avatar Preview" className="w-full h-full object-cover" />
+                </div>
+
+                <div
+                    className="flex-1 w-full text-center sm:text-left space-y-2 cursor-pointer"
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => fileInputRef.current?.click()}
+                >
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        className="hidden"
+                    />
+                    <div className="flex items-center justify-center sm:justify-start gap-2 text-stone-800 font-bold text-xs">
+                        <UploadCloud className="w-4 h-4 text-[#2A9D8F]" />
+                        <span>คลิกเพื่ออัปโหลด หรือลากไฟล์รูปภาพมาวางที่นี่ (`avatar_url`)</span>
+                    </div>
+                    <p className="text-[11px] text-stone-400">
+                        รองรับไฟล์รูปภาพ PNG, JPG หรือ WEBP (หากไม่เลือก ระบบจะใช้ค่าเริ่มต้นจากฐานข้อมูล)
+                    </p>
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            fileInputRef.current?.click();
+                        }}
+                        className="px-3 py-1.5 bg-[#2A9D8F] text-white text-[11px] font-bold rounded-xl hover:bg-[#217A70] transition-colors shadow-sm inline-flex items-center gap-1"
+                    >
+                        <ImageIcon className="w-3.5 h-3.5" /> เลือกไฟล์รูปจากเครื่อง
+                    </button>
+                </div>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
 
