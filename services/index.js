@@ -3,7 +3,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import multer from 'multer';
 
 import pool, { testConnection } from './config/db.js';
 import { upload, getSecureCloudinaryUrl } from './middleware/uploadMiddleware.js';
@@ -14,6 +13,7 @@ import sellerRoutes from './routes/sellerRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
+import buyerRoutes from './routes/buyerRoutes.js'; // นำเข้าเส้นทาง Buyer ที่สร้างขึ้นใหม่
 
 dotenv.config();
 
@@ -23,7 +23,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// อนุญาต Domain สำหรับ CORS
 const allowedOrigins = [
   'https://marketplace-handmade-craft.netlify.app',
   'http://localhost:5173',
@@ -39,7 +38,6 @@ if (process.env.CLIENT_URL) {
   });
 }
 
-// Middleware
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
@@ -57,10 +55,8 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static uploaded files (legacy compatibility)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Upload Endpoint via Cloudinary (คืนค่า HTTPS URL 100% ป้องกันรูปหายหลัง Refresh)
 app.post('/api/upload', upload.single('image'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'ไม่พบไฟล์รูปภาพ' });
@@ -69,7 +65,6 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   res.json({ success: true, url: fileUrl });
 });
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -78,7 +73,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Database schema auto-initializer for TiDB Cloud / MySQL
 const initDatabaseSchema = async () => {
   try {
     const isConnected = await testConnection();
@@ -87,7 +81,6 @@ const initDatabaseSchema = async () => {
       return;
     }
 
-    // Create categories table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS categories (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -96,7 +89,7 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // Create users table
+    // สร้างตาราง users พร้อมฟิลด์โปรไฟล์และ avatar_url ครบถ้วน
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -107,11 +100,49 @@ const initDatabaseSchema = async () => {
         role ENUM('buyer', 'seller', 'admin') DEFAULT 'buyer',
         store_name VARCHAR(150) NULL,
         bank_account VARCHAR(50) NULL,
+        phone VARCHAR(50) NULL,
+        address_no TEXT NULL,
+        subdistrict VARCHAR(100) NULL,
+        district VARCHAR(100) NULL,
+        province VARCHAR(100) NULL,
+        zipcode VARCHAR(20) NULL,
+        facebook VARCHAR(150) NULL,
+        instagram VARCHAR(150) NULL,
+        line_id VARCHAR(150) NULL,
+        avatar_url TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       ) ENGINE=InnoDB;
     `);
 
-    // Create shops table
+    // Migration helper สำหรับเติมคอลัมน์ในตาราง users อัตโนมัติกรณีตารางเดิมมีอยู่แล้ว
+    try {
+      const [existingUserCols] = await pool.query(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'users' AND TABLE_SCHEMA = DATABASE()`
+      );
+      const userColNames = existingUserCols.map(c => c.COLUMN_NAME);
+
+      const userFieldsToAdd = [
+        { name: 'phone', type: 'VARCHAR(50) NULL' },
+        { name: 'address_no', type: 'TEXT NULL' },
+        { name: 'subdistrict', type: 'VARCHAR(100) NULL' },
+        { name: 'district', type: 'VARCHAR(100) NULL' },
+        { name: 'province', type: 'VARCHAR(100) NULL' },
+        { name: 'zipcode', type: 'VARCHAR(20) NULL' },
+        { name: 'facebook', type: 'VARCHAR(150) NULL' },
+        { name: 'instagram', type: 'VARCHAR(150) NULL' },
+        { name: 'line_id', type: 'VARCHAR(150) NULL' },
+        { name: 'avatar_url', type: 'TEXT NULL' }
+      ];
+
+      for (const field of userFieldsToAdd) {
+        if (!userColNames.includes(field.name)) {
+          await pool.query(`ALTER TABLE users ADD COLUMN ${field.name} ${field.type}`);
+        }
+      }
+    } catch (migErr) {
+      console.warn('Users column migration notice:', migErr.message);
+    }
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS shops (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -135,7 +166,6 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // Create products table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS products (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -155,7 +185,6 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // Migration helper for products table columns if table existed prior
     try {
       const [existingCols] = await pool.query(
         `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'products' AND TABLE_SCHEMA = DATABASE()`
@@ -164,9 +193,6 @@ const initDatabaseSchema = async () => {
 
       if (!colNames.includes('stock_quantity')) {
         await pool.query('ALTER TABLE products ADD COLUMN stock_quantity INT DEFAULT 0 AFTER price');
-        if (colNames.includes('stock')) {
-          await pool.query('UPDATE products SET stock_quantity = stock WHERE stock_quantity = 0');
-        }
       }
       if (!colNames.includes('category_id')) {
         await pool.query('ALTER TABLE products ADD COLUMN category_id INT NULL AFTER seller_id');
@@ -184,7 +210,6 @@ const initDatabaseSchema = async () => {
       console.warn('Column migration notice:', migErr.message);
     }
 
-    // Create product options table (for craft customization)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS product_options (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -196,7 +221,6 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // Create product customizations table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS product_customizations (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -208,7 +232,6 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // Create orders table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -224,7 +247,6 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // Create order items table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS order_items (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -240,7 +262,6 @@ const initDatabaseSchema = async () => {
       ) ENGINE=InnoDB;
     `);
 
-    // Create craft tracking logs
     await pool.query(`
       CREATE TABLE IF NOT EXISTS craft_tracking_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -267,8 +288,8 @@ app.use('/api/seller', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/shops', shopRoutes);
+app.use('/api/buyer', buyerRoutes); // ประกาศใช้งานเส้นทาง Buyer API ที่นี่
 
-// Global Error Handler
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);
   res.status(err.status || 500).json({
@@ -277,7 +298,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start Express Server
 app.listen(PORT, async () => {
   console.log(`🌿 Craftiverse API Server running smoothly on http://localhost:${PORT}`);
   await initDatabaseSchema();
