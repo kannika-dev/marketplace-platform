@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
+import api from '../../../services/api'; // นำเข้าตัว api กลางตัวเดียวกับแดชบอร์ดผู้ขาย
 
 export const ProfileTab = () => {
-    // เคลียร์ค่าเริ่มต้นใน state ให้ว่างเปล่าเพื่อรอรับข้อมูลจริงจากฐานข้อมูลและทดสอบกรอก
     const [profile, setProfile] = useState({
         name: '',
         email: '',
@@ -21,26 +21,21 @@ export const ProfileTab = () => {
 
     const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
     const [previewAvatar, setPreviewAvatar] = useState(defaultAvatar);
-    const [selectedFile, setSelectedFile] = useState(null); // เก็บไฟล์รูปใหม่ที่เลือกจากเครื่อง
+    const [selectedFile, setSelectedFile] = useState(null);
 
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
 
-    // ดึง userId ของผู้ใช้ที่ล็อกอินอยู่ (จาก localStorage หรือระบบ Auth ของโปรเจกต์)
+    // ดึง userId ของผู้ใช้ที่ล็อกอินอยู่
     const userId = localStorage.getItem('userId') || '1';
 
-    // ดึงข้อมูลโปรไฟล์จริงจาก Backend (TiDB) เมื่อโหลดแท็บนี้
+    // ดึงข้อมูลโปรไฟล์จริงจาก Backend ผ่าน api กลาง
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`/api/buyer/${userId}`, {
-                    headers: {
-                        'Authorization': token ? `Bearer ${token}` : ''
-                    }
-                });
-                const result = await response.json();
+                const response = await api.get(`/buyer/${userId}`);
+                const result = response.data;
 
                 if (result.success && result.data) {
                     setProfile(result.data);
@@ -65,7 +60,6 @@ export const ProfileTab = () => {
         }));
     };
 
-    // ฟังก์ชันเลือกไฟล์รูปจากเครื่อง
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -73,14 +67,13 @@ export const ProfileTab = () => {
                 setErrorMsg('⚠️ กรุณาเลือกไฟล์รูปภาพเท่านั้นค่ะ');
                 return;
             }
-            setSelectedFile(file); // เก็บไฟล์จริงไว้ส่ง FormData
+            setSelectedFile(file);
             const imageUrl = URL.createObjectURL(file);
             setPreviewAvatar(imageUrl);
             setErrorMsg('');
         }
     };
 
-    // รองรับการลากไฟล์มาวาง (Drag & Drop)
     const handleDrop = (e) => {
         e.preventDefault();
         const file = e.dataTransfer.files[0];
@@ -96,7 +89,7 @@ export const ProfileTab = () => {
         e.preventDefault();
     };
 
-    // ฟังก์ชันกดบันทึกส่งข้อมูลจริงไปที่ Backend PUT API
+    // ฟังก์ชันกดบันทึกส่งข้อมูลจริงผ่าน api.put
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErrorMsg('');
@@ -110,30 +103,25 @@ export const ProfileTab = () => {
         }
 
         try {
-            const token = localStorage.getItem('token');
             const formData = new FormData();
 
-            // แนบข้อมูลฟิลด์ทั้งหมดลงใน FormData
             Object.keys(profile).forEach(key => {
                 if (profile[key] !== null && profile[key] !== undefined) {
                     formData.append(key, profile[key]);
                 }
             });
 
-            // ถ้ามีการเลือกไฟล์รูปใหม่ ให้แนบไปกับ key 'avatar' (ตรงกับ upload.single('avatar') หลังบ้าน)
             if (selectedFile) {
                 formData.append('avatar', selectedFile);
             }
 
-            const response = await fetch(`/api/buyer/${userId}`, {
-                method: 'PUT',
+            const response = await api.put(`/buyer/${userId}`, formData, {
                 headers: {
-                    'Authorization': token ? `Bearer ${token}` : ''
-                },
-                body: formData // ส่งแบบ FormData เพื่อรองรับไฟล์รูปภาพ
+                    'Content-Type': 'multipart/form-data'
+                }
             });
 
-            const result = await response.json();
+            const result = response.data;
 
             if (result.success) {
                 setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ avatar_url ในฐานข้อมูลสำเร็จเรียบร้อยแล้ว!');
@@ -147,7 +135,7 @@ export const ProfileTab = () => {
             }
         } catch (err) {
             console.error('Failed to update profile:', err);
-            setErrorMsg('⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+            setErrorMsg(err.response?.data?.message || '⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
         }
     };
 
@@ -177,7 +165,6 @@ export const ProfileTab = () => {
                 </div>
             )}
 
-            {/* ส่วนกล่องอัปโหลดและลากวางรูปภาพโปรไฟล์ (Avatar Upload Box) */}
             <div className="p-5 bg-emerald-50/40 rounded-3xl border-2 border-dashed border-emerald-200 flex flex-col sm:flex-row items-center gap-6">
                 <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-md flex-shrink-0 bg-stone-100">
                     <img src={previewAvatar || defaultAvatar} alt="Avatar Preview" className="w-full h-full object-cover" />
@@ -217,8 +204,6 @@ export const ProfileTab = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-
-                {/* ข้อมูลพื้นฐานทั่วไป */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-stone-700 mb-1">ชื่อ -นามสกุล (`name`)</label>
@@ -245,7 +230,6 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ข้อมูลการติดต่อ */}
                 <div className="space-y-4 pt-4 border-t border-stone-100">
                     <h3 className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
                         <Phone className="w-3.5 h-3.5 text-[#2A9D8F]" />
@@ -267,7 +251,6 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ที่อยู่สำหรับ Auto-Fill */}
                 <div className="space-y-4 pt-4 border-t border-stone-100">
                     <h3 className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-[#2A9D8F]" />
@@ -334,7 +317,6 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ช่องทางติดต่อเสริม */}
                 <div className="space-y-4 pt-4 border-t border-stone-100">
                     <h3 className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
                         <Share2 className="w-3.5 h-3.5 text-[#2A9D8F]" />
@@ -380,7 +362,6 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ปุ่มบันทึก */}
                 <div className="pt-6 border-t border-stone-100 flex justify-end">
                     <button
                         type="submit"
@@ -390,7 +371,6 @@ export const ProfileTab = () => {
                         <span>บันทึกข้อมูลโปรไฟล์</span>
                     </button>
                 </div>
-
             </form>
         </div>
     );
