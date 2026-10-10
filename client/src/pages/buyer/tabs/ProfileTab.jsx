@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
-import api from '../../../services/api'; // นำเข้าตัว api กลางตัวเดียวกับแดชบอร์ดผู้ขาย
 
 export const ProfileTab = () => {
+    const BACKEND_URL = 'https://marketplace-platform.onrender.com';
+
     const [profile, setProfile] = useState({
         name: '',
         email: '',
@@ -27,15 +28,18 @@ export const ProfileTab = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
 
-    // ดึง userId ของผู้ใช้ที่ล็อกอินอยู่
     const userId = localStorage.getItem('userId') || '1';
 
-    // ดึงข้อมูลโปรไฟล์จริงจาก Backend ผ่าน api กลาง
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const response = await api.get(`/buyer/${userId}`);
-                const result = response.data;
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, {
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    }
+                });
+                const result = await response.json();
 
                 if (result.success && result.data) {
                     setProfile(result.data);
@@ -89,7 +93,6 @@ export const ProfileTab = () => {
         e.preventDefault();
     };
 
-    // ฟังก์ชันกดบันทึกส่งข้อมูลจริงผ่าน api.put
     const handleSubmit = async (e) => {
         e.preventDefault();
         setErrorMsg('');
@@ -103,6 +106,7 @@ export const ProfileTab = () => {
         }
 
         try {
+            const token = localStorage.getItem('token');
             const formData = new FormData();
 
             Object.keys(profile).forEach(key => {
@@ -115,13 +119,15 @@ export const ProfileTab = () => {
                 formData.append('avatar', selectedFile);
             }
 
-            const response = await api.put(`/buyer/${userId}`, formData, {
+            const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, {
+                method: 'PUT',
                 headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: formData
             });
 
-            const result = response.data;
+            const result = await response.json();
 
             if (result.success) {
                 setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ avatar_url ในฐานข้อมูลสำเร็จเรียบร้อยแล้ว!');
@@ -135,12 +141,12 @@ export const ProfileTab = () => {
             }
         } catch (err) {
             console.error('Failed to update profile:', err);
-            setErrorMsg(err.response?.data?.message || '⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+            setErrorMsg('⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
         }
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-12">
             <div className="border-b border-stone-100 pb-4">
                 <h2 className="text-xl font-display font-extrabold text-stone-900 flex items-center gap-2">
                     <User className="w-5 h-5 text-[#2A9D8F]" />
@@ -362,10 +368,11 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                <div className="pt-6 border-t border-stone-100 flex justify-end">
+                {/* ปุ่มบันทึกอยู่ในฟอร์มและมีระยะห่างด้านล่างสวยงาม */}
+                <div className="pt-6 border-t border-stone-100 flex justify-end pb-8">
                     <button
                         type="submit"
-                        className="btn-3d-botanical px-6 py-3 rounded-2xl text-xs font-bold text-white shadow-md flex items-center gap-2 hover:opacity-90 transition-all"
+                        className="btn-3d-botanical px-6 py-3 rounded-2xl text-xs font-bold text-white shadow-md flex items-center gap-2 hover:opacity-90 transition-all cursor-pointer bg-emerald-800 hover:bg-emerald-700"
                     >
                         <Save className="w-4 h-4" />
                         <span>บันทึกข้อมูลโปรไฟล์</span>
