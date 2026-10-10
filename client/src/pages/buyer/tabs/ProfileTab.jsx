@@ -32,7 +32,7 @@ export const ProfileTab = () => {
     // ดึง userId จาก localStorage (รองรับหลายชื่อ key)[cite: 11]
     const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id') || '1';
 
-    // ฟังก์ชันดึง Token จาก localStorage (เพิ่ม craft_token เป็นอันดับแรกตามที่พบบนเบราว์เซอร์)[cite: 10, 11]
+    // ฟังก์ชันดึง Token จาก localStorage (ดึง craft_token เป็นอันดับแรก)[cite: 11]
     const getStoredToken = () => {
         return localStorage.getItem('craft_token') ||
             localStorage.getItem('token') ||

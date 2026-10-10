@@ -1,9 +1,8 @@
 import db from '../config/db.js';
 
-// ดึงข้อมูลโปรไฟล์ผู้ซื้อจาก Token หรือ ID
+// ดึงข้อมูลโปรไฟล์ผู้ซื้อ
 export const getBuyerProfile = async (req, res) => {
     try {
-        // ใช้ userId จาก URL หรือถ้ามียศจาก Token ให้ดึงตาม Token ได้เลย
         const userId = req.params.userId || req.user?.id;
 
         const [rows] = await db.execute(

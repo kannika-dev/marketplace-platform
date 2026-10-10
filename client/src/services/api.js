@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-// ดึง VITE_API_URL มาใช้ ถ้านึกไม่ออกให้กลับไปใช้ localhost:5000[cite: 9]
+// ดึง VITE_API_URL มาใช้ ถ้านึกไม่ออกให้กลับไปใช้ localhost:5000
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://marketplace-platform-xh1q.onrender.com';
 
 const api = axios.create({
@@ -37,16 +37,16 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle unauthorized gracefully[cite: 9]
+// Response interceptor to handle unauthorized gracefully
 api.interceptors.response.use(
-  (response) => response, //[cite: 9]
+  (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) { //[cite: 9]
-      // Clean up token if unauthorized[cite: 9]
-      localStorage.removeItem('craft_token'); //[cite: 9]
+    if (error.response && error.response.status === 401) {
+      // Clean up token if unauthorized
+      localStorage.removeItem('craft_token');
     }
-    return Promise.reject(error); //[cite: 9]
+    return Promise.reject(error);
   }
 );
 
-export default api; //[cite: 9]
+export default api;
