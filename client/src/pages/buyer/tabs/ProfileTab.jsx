@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileTab = () => {
-    const BACKEND_URL = 'https://marketplace-platform.onrender.com';
+    // ใช้ลิงก์ Backend ตัวจริงของโปรเจกต์นี้ที่ถูกต้อง
+    const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
 
     const [profile, setProfile] = useState({
         name: '',
@@ -28,24 +29,27 @@ export const ProfileTab = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
 
-    // ดึง userId หรือดึงค่าสำรอง
-    const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || '1';
+    // ดึง userId จาก localStorage (รองรับหลายชื่อ key)
+    const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id') || '1';
+
+    // ฟังก์ชันดึง Token จาก localStorage
+    const getStoredToken = () => {
+        return localStorage.getItem('token') ||
+            localStorage.getItem('accessToken') ||
+            localStorage.getItem('jwt') ||
+            localStorage.getItem('userToken') || '';
+    };
 
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const token = localStorage.getItem('token');
-                if (!token) {
-                    setErrorMsg('⚠️ กรุณาเข้าสู่ระบบใหม่อีกครั้ง (ไม่พบ Token การใช้งาน)');
-                    return;
+                const token = getStoredToken();
+                const headers = {};
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
                 }
 
-                const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
+                const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, { headers });
                 const result = await response.json();
 
                 if (result.success && result.data) {
@@ -53,6 +57,7 @@ export const ProfileTab = () => {
                     if (result.data.avatar_url) {
                         setPreviewAvatar(result.data.avatar_url);
                     }
+                    setErrorMsg('');
                 } else {
                     setErrorMsg(`⚠️ ${result.message || 'ไม่สามารถโหลดข้อมูลโปรไฟล์ได้'}`);
                 }
@@ -62,7 +67,9 @@ export const ProfileTab = () => {
             }
         };
 
-        fetchProfile();
+        if (userId) {
+            fetchProfile();
+        }
     }, [userId]);
 
     const handleChange = (e) => {
@@ -109,13 +116,13 @@ export const ProfileTab = () => {
 
         if (profile.role === 'buyer') {
             if (!profile.phone || !profile.address_no || !profile.province || !profile.zipcode) {
-                setErrorMsg('⚠️ สำหรับผู้ซื้อ (Buyer) กรุณากรอกเบอร์โทรศัพท์และที่อยู่จัดส่งให้ครบถ้วนเพื่อใช้สำหรับระบบ Auto-Fill ครับ/ค่ะ');
+                setErrorMsg('⚠️ สำหรับผู้ซื้อ (Buyer) กรุณากรอกเบอร์โทรศัพท์และที่อยู่จัดส่งให้ครบถ้วนเพื่อใช้สำหรับระบบ Auto-Fill ค่ะ');
                 return;
             }
         }
 
         try {
-            const token = localStorage.getItem('token');
+            const token = getStoredToken();
             const formData = new FormData();
 
             Object.keys(profile).forEach(key => {
@@ -128,18 +135,21 @@ export const ProfileTab = () => {
                 formData.append('avatar', selectedFile);
             }
 
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, {
                 method: 'PUT',
-                headers: {
-                    'Authorization': token ? `Bearer ${token}` : ''
-                },
+                headers,
                 body: formData
             });
 
             const result = await response.json();
 
             if (result.success) {
-                setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์สำเร็จเรียบร้อยแล้ว!');
+                setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ในฐานข้อมูลสำเร็จเรียบร้อยแล้ว!');
                 if (result.avatar_url) {
                     setPreviewAvatar(result.avatar_url);
                     setProfile(prev => ({ ...prev, avatar_url: result.avatar_url }));
@@ -377,7 +387,7 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ปุ่มบันทึกดีไซน์ใหม่ สีเขียวพรีเมียม ชัดเจน */}
+                {/* ปุ่มบันทึก */}
                 <div className="pt-6 border-t border-stone-100 flex justify-end pb-12">
                     <button
                         type="submit"
