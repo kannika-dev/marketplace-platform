@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     User,
     Heart,
@@ -10,7 +10,7 @@ import {
     Phone
 } from 'lucide-react';
 
-// นำเข้าคอมโพเนนต์แท็บย่อยต่างๆ (หากยังไม่มีแท็บย่อย สามารถสร้างไฟล์รองรับไว้ได้เลยจ้า)
+// นำเข้าคอมโพเนนต์แท็บย่อยต่างๆ
 import ProfileTab from './tabs/ProfileTab';
 import WishlistTab from './tabs/WishlistTab';
 import CartOrdersTab from './tabs/CartOrdersTab';
@@ -19,27 +19,63 @@ import HistoryTab from './tabs/HistoryTab';
 import StatsTab from './tabs/StatsTab';
 
 export const BuyerDashboard = () => {
+    const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
     const [activeTab, setActiveTab] = useState('profile');
 
-    const [buyerProfile] = useState({
-        name: 'กานต์ดา มั่งคั่ง',
-        username: 'kan_collector',
-        email: 'kanda.craft@gmail.com',
-        phone: '081-234-5678',
-        address_no: '123/45',
-        subdistrict: 'คลองเตย',
-        district: 'คลองเตย',
-        province: 'กรุงเทพมหานคร',
-        zipcode: '10110',
+    const [buyerProfile, setBuyerProfile] = useState({
+        name: 'กำลังโหลด...',
+        username: 'collector',
+        email: '',
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
         role: 'buyer'
     });
+
+    // ดึง userId และ Token จาก localStorage
+    const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id') || '1';
+    const getStoredToken = () => {
+        return localStorage.getItem('craft_token') ||
+            localStorage.getItem('token') ||
+            localStorage.getItem('accessToken') ||
+            localStorage.getItem('jwt') || '';
+    };
+
+    // โหลดข้อมูลโปรไฟล์จริงจาก TiDB มาแสดงที่ Sidebar ด้านซ้ายแบบเรียลไทม์
+    useEffect(() => {
+        const fetchDashboardProfile = async () => {
+            try {
+                const token = getStoredToken();
+                const headers = {};
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+
+                const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, { headers });
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    setBuyerProfile({
+                        name: result.data.name || 'ผู้ใช้งาน Craftiverse',
+                        username: result.data.email ? result.data.email.split('@')[0] : 'collector',
+                        email: result.data.email,
+                        avatar: result.data.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+                        role: result.data.role || 'buyer'
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to fetch sidebar profile:', err);
+            }
+        };
+
+        if (userId) {
+            fetchDashboardProfile();
+        }
+    }, [userId]);
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-                {/* LEFT SIDEBAR */}
+                {/* LEFT SIDEBAR (ซิงค์ข้อมูลจริงจาก TiDB แล้ว) */}
                 <div className="lg:col-span-3 space-y-6 sticky top-24">
                     <div className="clay-card p-6 rounded-3xl border border-white text-center space-y-4 shadow-xl bg-white/95 backdrop-blur-md">
                         <div className="relative w-24 h-24 mx-auto">
@@ -56,7 +92,7 @@ export const BuyerDashboard = () => {
                             <h2 className="text-base font-display font-extrabold text-stone-900">{buyerProfile.name}</h2>
                             <p className="text-xs text-stone-400 font-mono">@{buyerProfile.username}</p>
                             <span className="inline-block mt-2 px-3 py-1 bg-[#E8F7F3] text-[#2A9D8F] text-[11px] font-bold rounded-full border border-[#A2D9D2]">
-                                Collector (Buyer)
+                                {buyerProfile.role === 'admin' ? 'Administrator' : buyerProfile.role === 'seller' ? 'Seller' : 'Collector (Buyer)'}
                             </span>
                         </div>
                     </div>
