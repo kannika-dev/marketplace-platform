@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileTab = () => {
-    // ใช้ลิงก์ Backend ตัวจริงของโปรเจกต์นี้ที่ถูกต้อง
+    // ใช้ลิงก์ Backend ตัวจริงของโปรเจกต์นี้ที่ถูกต้อง[cite: 1]
     const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
 
     const [profile, setProfile] = useState({
@@ -29,12 +29,13 @@ export const ProfileTab = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
 
-    // ดึง userId จาก localStorage (รองรับหลายชื่อ key)
+    // ดึง userId จาก localStorage (รองรับหลายชื่อ key)[cite: 11]
     const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id') || '1';
 
-    // ฟังก์ชันดึง Token จาก localStorage
+    // ฟังก์ชันดึง Token จาก localStorage (เพิ่ม craft_token เป็นอันดับแรกตามที่พบบนเบราว์เซอร์)[cite: 10, 11]
     const getStoredToken = () => {
-        return localStorage.getItem('token') ||
+        return localStorage.getItem('craft_token') ||
+            localStorage.getItem('token') ||
             localStorage.getItem('accessToken') ||
             localStorage.getItem('jwt') ||
             localStorage.getItem('userToken') || '';
