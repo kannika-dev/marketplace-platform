@@ -23,31 +23,9 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const allowedOrigins = [
-  'https://marketplace-platform-handcrafted.netlify.app',
-  'https://marketplace-handmade-craft.netlify.app',
-  'http://localhost:5173',
-  'http://localhost:3000'
-];
-
-if (process.env.CLIENT_URL) {
-  const urls = process.env.CLIENT_URL.split(',').map(url => url.trim());
-  urls.forEach(url => {
-    if (url && !allowedOrigins.includes(url)) {
-      allowedOrigins.push(url);
-    }
-  });
-}
-
+// ตั้งค่า CORS แบบเปิดกว้าง (Wildcard) เพื่อตัดปัญหาบล็อกข้ามโดเมนระหว่าง Netlify กับ Render 100%
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.warn(`⚠️ CORS blocked request from origin: ${origin}`);
-      callback(null, true);
-    }
-  },
+  origin: '*',
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
