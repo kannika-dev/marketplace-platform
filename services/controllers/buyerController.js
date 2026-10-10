@@ -1,6 +1,6 @@
-import db from '../services/config/db.js'; // ตัวเชื่อมต่อ TiDB กลางของโปรเจกต์
+import db from '../config/db.js';
 
-// 1. ดึงข้อมูลโปรไฟล์ผู้ซื้อ
+// ดึงข้อมูลโปรไฟล์ผู้ซื้อ
 export const getBuyerProfile = async (req, res) => {
     try {
         const { userId } = req.params;
