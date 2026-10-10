@@ -10,7 +10,6 @@ import {
     Phone
 } from 'lucide-react';
 
-// นำเข้าคอมโพเนนต์แท็บย่อยต่างๆ
 import ProfileTab from './tabs/ProfileTab';
 import WishlistTab from './tabs/WishlistTab';
 import CartOrdersTab from './tabs/CartOrdersTab';
@@ -21,6 +20,7 @@ import StatsTab from './tabs/StatsTab';
 export const BuyerDashboard = () => {
     const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
     const [activeTab, setActiveTab] = useState('profile');
+    const [refreshKey, setRefreshKey] = useState(0); // ตัวแปรสำหรับสั่งรีเฟรชข้อมูล sidebar ทันทีที่บันทึก
 
     const [buyerProfile, setBuyerProfile] = useState({
         name: 'กำลังโหลด...',
@@ -30,7 +30,6 @@ export const BuyerDashboard = () => {
         role: 'buyer'
     });
 
-    // ดึง userId และ Token จาก localStorage
     const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id') || '1';
     const getStoredToken = () => {
         return localStorage.getItem('craft_token') ||
@@ -39,43 +38,47 @@ export const BuyerDashboard = () => {
             localStorage.getItem('jwt') || '';
     };
 
-    // โหลดข้อมูลโปรไฟล์จริงจาก TiDB มาแสดงที่ Sidebar ด้านซ้ายแบบเรียลไทม์
-    useEffect(() => {
-        const fetchDashboardProfile = async () => {
-            try {
-                const token = getStoredToken();
-                const headers = {};
-                if (token) {
-                    headers['Authorization'] = `Bearer ${token}`;
-                }
-
-                const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, { headers });
-                const result = await response.json();
-
-                if (result.success && result.data) {
-                    setBuyerProfile({
-                        name: result.data.name || 'ผู้ใช้งาน Craftiverse',
-                        username: result.data.email ? result.data.email.split('@')[0] : 'collector',
-                        email: result.data.email,
-                        avatar: result.data.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-                        role: result.data.role || 'buyer'
-                    });
-                }
-            } catch (err) {
-                console.error('Failed to fetch sidebar profile:', err);
+    const fetchDashboardProfile = async () => {
+        try {
+            const token = getStoredToken();
+            const headers = {};
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
             }
-        };
 
+            const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, { headers });
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                setBuyerProfile({
+                    name: result.data.name || 'ผู้ใช้งาน Craftiverse',
+                    username: result.data.email ? result.data.email.split('@')[0] : 'collector',
+                    email: result.data.email,
+                    avatar: result.data.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+                    role: result.data.role || 'buyer'
+                });
+            }
+        } catch (err) {
+            console.error('Failed to fetch sidebar profile:', err);
+        }
+    };
+
+    useEffect(() => {
         if (userId) {
             fetchDashboardProfile();
         }
-    }, [userId]);
+    }, [userId, refreshKey]);
+
+    // ฟังก์ชันสั่งอัปเดต Sidebar ทันทีหลังกดบันทึกสำเร็จในหน้า ProfileTab
+    const handleProfileUpdated = () => {
+        setRefreshKey(prev => prev + 1);
+    };
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-                {/* LEFT SIDEBAR (ซิงค์ข้อมูลจริงจาก TiDB แล้ว) */}
+                {/* LEFT SIDEBAR */}
                 <div className="lg:col-span-3 space-y-6 sticky top-24">
                     <div className="clay-card p-6 rounded-3xl border border-white text-center space-y-4 shadow-xl bg-white/95 backdrop-blur-md">
                         <div className="relative w-24 h-24 mx-auto">
@@ -152,7 +155,7 @@ export const BuyerDashboard = () => {
                 {/* RIGHT MAIN CONTENT */}
                 <div className="lg:col-span-9">
                     <div className="clay-card p-6 sm:p-8 rounded-3xl border border-white shadow-xl min-h-[600px] bg-white/95 backdrop-blur-md">
-                        {activeTab === 'profile' && <ProfileTab />}
+                        {activeTab === 'profile' && <ProfileTab onProfileUpdated={handleProfileUpdated} />}
                         {activeTab === 'wishlist' && <WishlistTab />}
                         {activeTab === 'cart-orders' && <CartOrdersTab />}
                         {activeTab === 'tracking' && <CraftTrackingTab />}

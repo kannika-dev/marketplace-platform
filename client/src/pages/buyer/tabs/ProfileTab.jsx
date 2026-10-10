@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
-export const ProfileTab = () => {
-    // ใช้ลิงก์ Backend ตัวจริงของโปรเจกต์นี้ที่ถูกต้อง[cite: 1]
+export const ProfileTab = ({ onProfileUpdated }) => {
+    // ใช้ลิงก์ Backend ตัวจริงของโปรเจกต์นี้ที่ถูกต้อง
     const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
 
     const [profile, setProfile] = useState({
@@ -29,10 +29,10 @@ export const ProfileTab = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
 
-    // ดึง userId จาก localStorage (รองรับหลายชื่อ key)[cite: 11]
+    // ดึง userId จาก localStorage (รองรับหลายชื่อ key)
     const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || localStorage.getItem('id') || '1';
 
-    // ฟังก์ชันดึง Token จาก localStorage (ดึง craft_token เป็นอันดับแรก)[cite: 11]
+    // ฟังก์ชันดึง Token จาก localStorage (ดึง craft_token เป็นอันดับแรก)
     const getStoredToken = () => {
         return localStorage.getItem('craft_token') ||
             localStorage.getItem('token') ||
@@ -156,6 +156,11 @@ export const ProfileTab = () => {
                     setProfile(prev => ({ ...prev, avatar_url: result.avatar_url }));
                 }
                 setSelectedFile(null);
+
+                // สั่งแจ้งเตือนให้ BuyerDashboard อัปเดตรูปและชื่อที่ Sidebar ด้านซ้ายทันที
+                if (onProfileUpdated) {
+                    onProfileUpdated();
+                }
             } else {
                 setErrorMsg(`⚠️ บันทึกไม่สำเร็จ: ${result.message}`);
             }
