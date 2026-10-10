@@ -1,11 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileTab = () => {
     // โครงสร้าง state สอดคล้องกับตาราง users (รวม avatar_url)
     const [profile, setProfile] = useState({
-        name: 'กานต์ดา มั่งคั่ง',
-        email: 'kanda.craft@gmail.com',
+        name: '',
+        email: '',
         role: 'buyer',
         avatar_url: '',
         phone: '',
@@ -20,11 +20,42 @@ export const ProfileTab = () => {
     });
 
     const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
-    const [previewAvatar, setPreviewAvatar] = useState(profile.avatar_url || defaultAvatar);
+    const [previewAvatar, setPreviewAvatar] = useState(defaultAvatar);
+    const [selectedFile, setSelectedFile] = useState(null); // เก็บไฟล์รูปใหม่ที่เลือกจากเครื่อง
 
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
+
+    // ดึง userId ของผู้ใช้ที่ล็อกอินอยู่ (จาก localStorage หรือระบบ Auth ของโปรเจกต์)
+    const userId = localStorage.getItem('userId') || '1';
+
+    // ดึงข้อมูลโปรไฟล์จริงจาก Backend (TiDB) เมื่อโหลดแท็บนี้
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/buyer/${userId}`, {
+                    headers: {
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    }
+                });
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    setProfile(result.data);
+                    if (result.data.avatar_url) {
+                        setPreviewAvatar(result.data.avatar_url);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch profile:', err);
+                setErrorMsg('⚠️ ไม่สามารถโหลดข้อมูลโปรไฟล์จากฐานข้อมูลได้');
+            }
+        };
+
+        fetchProfile();
+    }, [userId]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -42,9 +73,9 @@ export const ProfileTab = () => {
                 setErrorMsg('⚠️ กรุณาเลือกไฟล์รูปภาพเท่านั้นค่ะ');
                 return;
             }
+            setSelectedFile(file); // เก็บไฟล์จริงไว้ส่ง FormData
             const imageUrl = URL.createObjectURL(file);
             setPreviewAvatar(imageUrl);
-            setProfile(prev => ({ ...prev, avatar_url: imageUrl }));
             setErrorMsg('');
         }
     };
@@ -54,9 +85,9 @@ export const ProfileTab = () => {
         e.preventDefault();
         const file = e.dataTransfer.files[0];
         if (file && file.type.startsWith('image/')) {
+            setSelectedFile(file);
             const imageUrl = URL.createObjectURL(file);
             setPreviewAvatar(imageUrl);
-            setProfile(prev => ({ ...prev, avatar_url: imageUrl }));
             setErrorMsg('');
         }
     };
@@ -65,7 +96,8 @@ export const ProfileTab = () => {
         e.preventDefault();
     };
 
-    const handleSubmit = (e) => {
+    // ฟังก์ชันกดบันทึกส่งข้อมูลจริงไปที่ Backend PUT API
+    const handleSubmit = async (e) => {
         e.preventDefault();
         setErrorMsg('');
         setSuccessMsg('');
@@ -77,8 +109,46 @@ export const ProfileTab = () => {
             }
         }
 
-        console.log('Saving to users table fields:', profile);
-        setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ avatar_url สำเร็จเรียบร้อยแล้ว!');
+        try {
+            const token = localStorage.getItem('token');
+            const formData = new FormData();
+
+            // แนบข้อมูลฟิลด์ทั้งหมดลงใน FormData
+            Object.keys(profile).forEach(key => {
+                if (profile[key] !== null && profile[key] !== undefined) {
+                    formData.append(key, profile[key]);
+                }
+            });
+
+            // ถ้ามีการเลือกไฟล์รูปใหม่ ให้แนบไปกับ key 'avatar' (ตรงกับ upload.single('avatar') หลังบ้าน)
+            if (selectedFile) {
+                formData.append('avatar', selectedFile);
+            }
+
+            const response = await fetch(`/api/buyer/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: formData // ส่งแบบ FormData เพื่อรองรับไฟล์รูปภาพ
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ avatar_url ในฐานข้อมูลสำเร็จเรียบร้อยแล้ว!');
+                if (result.avatar_url) {
+                    setPreviewAvatar(result.avatar_url);
+                    setProfile(prev => ({ ...prev, avatar_url: result.avatar_url }));
+                }
+                setSelectedFile(null);
+            } else {
+                setErrorMsg(`⚠️ บันทึกไม่สำเร็จ: ${result.message}`);
+            }
+        } catch (err) {
+            console.error('Failed to update profile:', err);
+            setErrorMsg('⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
+        }
     };
 
     return (
@@ -155,7 +225,7 @@ export const ProfileTab = () => {
                         <input
                             type="text"
                             name="name"
-                            value={profile.name}
+                            value={profile.name || ''}
                             onChange={handleChange}
                             className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs bg-stone-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
                             required
@@ -167,7 +237,7 @@ export const ProfileTab = () => {
                         <input
                             type="email"
                             name="email"
-                            value={profile.email}
+                            value={profile.email || ''}
                             disabled
                             className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs bg-stone-100 text-stone-500 cursor-not-allowed"
                         />
@@ -189,7 +259,7 @@ export const ProfileTab = () => {
                         <input
                             type="text"
                             name="phone"
-                            value={profile.phone}
+                            value={profile.phone || ''}
                             onChange={handleChange}
                             placeholder="เช่น 0812345678"
                             className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
@@ -210,7 +280,7 @@ export const ProfileTab = () => {
                             <input
                                 type="text"
                                 name="address_no"
-                                value={profile.address_no}
+                                value={profile.address_no || ''}
                                 onChange={handleChange}
                                 placeholder="เช่น 123/45 หมู่บ้านคราฟต์วิลล์ ซอย 3"
                                 className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
@@ -222,7 +292,7 @@ export const ProfileTab = () => {
                             <input
                                 type="text"
                                 name="subdistrict"
-                                value={profile.subdistrict}
+                                value={profile.subdistrict || ''}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
                             />
@@ -233,7 +303,7 @@ export const ProfileTab = () => {
                             <input
                                 type="text"
                                 name="district"
-                                value={profile.district}
+                                value={profile.district || ''}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
                             />
@@ -244,7 +314,7 @@ export const ProfileTab = () => {
                             <input
                                 type="text"
                                 name="province"
-                                value={profile.province}
+                                value={profile.province || ''}
                                 onChange={handleChange}
                                 className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
                             />
@@ -255,7 +325,7 @@ export const ProfileTab = () => {
                             <input
                                 type="text"
                                 name="zipcode"
-                                value={profile.zipcode}
+                                value={profile.zipcode || ''}
                                 onChange={handleChange}
                                 placeholder="เช่น 10110"
                                 className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
@@ -277,7 +347,7 @@ export const ProfileTab = () => {
                             <input
                                 type="text"
                                 name="facebook"
-                                value={profile.facebook}
+                                value={profile.facebook || ''}
                                 onChange={handleChange}
                                 placeholder="ชื่อเฟสบุ๊คหรือลิงก์"
                                 className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
@@ -289,7 +359,7 @@ export const ProfileTab = () => {
                             <input
                                 type="text"
                                 name="instagram"
-                                value={profile.instagram}
+                                value={profile.instagram || ''}
                                 onChange={handleChange}
                                 placeholder="@username"
                                 className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
@@ -301,7 +371,7 @@ export const ProfileTab = () => {
                             <input
                                 type="text"
                                 name="line_id"
-                                value={profile.line_id}
+                                value={profile.line_id || ''}
                                 onChange={handleChange}
                                 placeholder="ไอดีไลน์"
                                 className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
