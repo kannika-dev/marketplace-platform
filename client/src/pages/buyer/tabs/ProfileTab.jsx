@@ -2,12 +2,12 @@ import React, { useState, useRef } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileTab = () => {
-    // โครงสร้าง state สอดคล้องกับคอลัมน์ในตาราง users จริง (รวม avatar_url)
+    // โครงสร้าง state สอดคล้องกับตาราง users (รวม avatar_url)
     const [profile, setProfile] = useState({
         name: 'กานต์ดา มั่งคั่ง',
         email: 'kanda.craft@gmail.com',
-        role: 'buyer', // 'buyer' หรือ 'admin' หรือ 'seller'
-        avatar_url: '', // ตรงกับคอลัมน์ใหม่ในฐานข้อมูล
+        role: 'buyer',
+        avatar_url: '',
         phone: '',
         address_no: '',
         subdistrict: '',
@@ -19,7 +19,6 @@ export const ProfileTab = () => {
         line_id: ''
     });
 
-    // กำหนดรูปเริ่มต้น (Fall-back หาก avatar_url เป็นค่าว่าง NULL)
     const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80';
     const [previewAvatar, setPreviewAvatar] = useState(profile.avatar_url || defaultAvatar);
 
@@ -27,7 +26,6 @@ export const ProfileTab = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
 
-    // ฟังก์ชันอัปเดตค่าในฟอร์ม
     const handleChange = (e) => {
         const { name, value } = e.target;
         setProfile(prev => ({
@@ -36,7 +34,7 @@ export const ProfileTab = () => {
         }));
     };
 
-    // ฟังก์ชันจัดการเมื่อเลือกไฟล์รูปจากเครื่อง (แปลงเป็น Object URL สำหรับพรีวิว)
+    // ฟังก์ชันเลือกไฟล์รูปจากเครื่อง
     const handleFileChange = (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -67,13 +65,11 @@ export const ProfileTab = () => {
         e.preventDefault();
     };
 
-    // ฟังก์ชันกดบันทึกพร้อมเช็กเงื่อนไขบังคับเฉพาะ Buyer
     const handleSubmit = (e) => {
         e.preventDefault();
         setErrorMsg('');
         setSuccessMsg('');
 
-        // เงื่อนไขสิทธิ์: ถ้าเป็น Buyer บังคับเบอร์โทร (phone) และที่อยู่จัดส่ง
         if (profile.role === 'buyer') {
             if (!profile.phone || !profile.address_no || !profile.province || !profile.zipcode) {
                 setErrorMsg('⚠️ สำหรับผู้ซื้อ (Buyer) กรุณากรอกเบอร์โทรศัพท์และที่อยู่จัดส่งให้ครบถ้วนเพื่อใช้สำหรับระบบ Auto-Fill และการจัดส่งสินค้าค่ะ');
@@ -81,9 +77,8 @@ export const ProfileTab = () => {
             }
         }
 
-        // จำลองการส่งข้อมูลไปบันทึกที่ตาราง users ใน Database
         console.log('Saving to users table fields:', profile);
-        setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ในตาราง users สำเร็จเรียบร้อยแล้ว!');
+        setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ avatar_url สำเร็จเรียบร้อยแล้ว!');
     };
 
     return (
@@ -98,7 +93,6 @@ export const ProfileTab = () => {
                 </p>
             </div>
 
-            {/* แจ้งเตือนข้อผิดพลาด (ถ้ามี) */}
             {errorMsg && (
                 <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs flex items-center gap-2 shadow-sm">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -106,7 +100,6 @@ export const ProfileTab = () => {
                 </div>
             )}
 
-            {/* แจ้งเตือนบันทึกสำเร็จ */}
             {successMsg && (
                 <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-2xl text-xs flex items-center gap-2 shadow-sm">
                     <CheckCircle2 className="w-4 h-4 shrink-0 text-[#2A9D8F]" />
@@ -114,7 +107,7 @@ export const ProfileTab = () => {
                 </div>
             )}
 
-            {/* ส่วนอัปโหลดและลากวางรูปภาพโปรไฟล์ (เก็บบันทึกลงฟิลด์ avatar_url) */}
+            {/* ส่วนกล่องอัปโหลดและลากวางรูปภาพโปรไฟล์ (Avatar Upload Box) */}
             <div className="p-5 bg-emerald-50/40 rounded-3xl border-2 border-dashed border-emerald-200 flex flex-col sm:flex-row items-center gap-6">
                 <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-md flex-shrink-0 bg-stone-100">
                     <img src={previewAvatar || defaultAvatar} alt="Avatar Preview" className="w-full h-full object-cover" />
@@ -138,7 +131,7 @@ export const ProfileTab = () => {
                         <span>คลิกเพื่ออัปโหลด หรือลากไฟล์รูปภาพมาวางที่นี่ (`avatar_url`)</span>
                     </div>
                     <p className="text-[11px] text-stone-400">
-                        รองรับไฟล์รูปภาพ PNG, JPG หรือ WEBP (หากไม่เลือก ระบบจะใช้ค่าเริ่มต้นจากฐานข้อมูล)
+                        รองรับไฟล์รูปภาพ PNG, JPG หรือ WEBP จากเครื่องคอมพิวเตอร์ของคุณ
                     </p>
                     <button
                         type="button"
@@ -182,31 +175,29 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ข้อมูลการติดต่อ (บังคับเบอร์โทรเฉพาะ Buyer) */}
+                {/* ข้อมูลการติดต่อ */}
                 <div className="space-y-4 pt-4 border-t border-stone-100">
                     <h3 className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
                         <Phone className="w-3.5 h-3.5 text-[#2A9D8F]" />
                         ข้อมูลการติดต่อหลัก {profile.role === 'buyer' && <span className="text-rose-500 text-[10px] font-normal">(บังคับสำหรับ Buyer)</span>}
                     </h3>
 
-                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-stone-700 mb-1">
-                                เบอร์โทรศัพท์สำหรับติดต่อ/จัดส่ง (`phone`) {profile.role === 'buyer' && <span className="text-rose-500">*</span>}
-                            </label>
-                            <input
-                                type="text"
-                                name="phone"
-                                value={profile.phone}
-                                onChange={handleChange}
-                                placeholder="เช่น 0812345678"
-                                className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
-                            />
-                        </div>
+                    <div>
+                        <label className="block text-xs font-bold text-stone-700 mb-1">
+                            เบอร์โทรศัพท์สำหรับติดต่อ/จัดส่ง (`phone`) {profile.role === 'buyer' && <span className="text-rose-500">*</span>}
+                        </label>
+                        <input
+                            type="text"
+                            name="phone"
+                            value={profile.phone}
+                            onChange={handleChange}
+                            placeholder="เช่น 0812345678"
+                            className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#2A9D8F]/30"
+                        />
                     </div>
                 </div>
 
-                {/* ข้อมูลที่อยู่สำหรับ Auto-Fill */}
+                {/* ที่อยู่สำหรับ Auto-Fill */}
                 <div className="space-y-4 pt-4 border-t border-stone-100">
                     <h3 className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
                         <MapPin className="w-3.5 h-3.5 text-[#2A9D8F]" />
@@ -273,7 +264,7 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ช่องทางติดต่อเสริม (Social Links) */}
+                {/* ช่องทางติดต่อเสริม */}
                 <div className="space-y-4 pt-4 border-t border-stone-100">
                     <h3 className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
                         <Share2 className="w-3.5 h-3.5 text-[#2A9D8F]" />
