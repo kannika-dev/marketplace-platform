@@ -24,7 +24,7 @@ export const getBuyerProfile = async (req, res) => {
     }
 };
 
-// 2. อัปเดตข้อมูลโปรไฟล์และ avatar_url (รองรับไฟล์รูปจาก Cloudinary)
+// อัปเดตข้อมูลโปรไฟล์และ avatar_url (ป้องกัน Error ด้วยการแปลง undefined เป็น null)
 export const updateBuyerProfile = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -41,13 +41,24 @@ export const updateBuyerProfile = async (req, res) => {
             line_id
         } = req.body;
 
-        // เช็กว่ามีการอัปโหลดไฟล์รูปภาพใหม่เข้ามาผ่าน Cloudinary middleware หรือไม่
-        let avatar_url = req.body.avatar_url; // กรณีส่งมาเป็นลิงก์เดิมหรือลิงก์ออนไลน์
+        let avatar_url = req.body.avatar_url || null;
         if (req.file && req.file.path) {
-            avatar_url = req.file.path; // ลิงก์รูปภาพที่ปลอดภัยจาก Cloudinary ที่อัปโหลดจากเครื่อง
+            avatar_url = req.file.path; // ลิงก์รูปภาพปลอดภัยจาก Cloudinary
         }
 
-        // อัปเดตข้อมูลลงตาราง users ใน TiDB
+        // ป้องกัน Error: Bind parameters must not contain undefined โดยการแปลงเป็น null
+        const safeName = name ?? null;
+        const safePhone = phone ?? null;
+        const safeAddressNo = address_no ?? null;
+        const safeSubdistrict = subdistrict ?? null;
+        const safeDistrict = district ?? null;
+        const safeProvince = province ?? null;
+        const safeZipcode = zipcode ?? null;
+        const safeFacebook = facebook ?? null;
+        const safeInstagram = instagram ?? null;
+        const safeLineId = line_id ?? null;
+        const safeAvatarUrl = avatar_url ?? null;
+
         const query = `
             UPDATE users 
             SET name = ?, phone = ?, address_no = ?, subdistrict = ?, district = ?, province = ?, zipcode = ?, facebook = ?, instagram = ?, line_id = ?, avatar_url = ?
@@ -55,24 +66,24 @@ export const updateBuyerProfile = async (req, res) => {
         `;
 
         await db.execute(query, [
-            name,
-            phone,
-            address_no,
-            subdistrict,
-            district,
-            province,
-            zipcode,
-            facebook,
-            instagram,
-            line_id,
-            avatar_url,
+            safeName,
+            safePhone,
+            safeAddressNo,
+            safeSubdistrict,
+            safeDistrict,
+            safeProvince,
+            safeZipcode,
+            safeFacebook,
+            safeInstagram,
+            safeLineId,
+            safeAvatarUrl,
             userId
         ]);
 
         res.status(200).json({
             success: true,
             message: '✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ avatar_url สำเร็จเรียบร้อยแล้ว!',
-            avatar_url: avatar_url // ส่งค่ารูปล่าสุดกลับไปแสดงผลที่หน้าบ้าน
+            avatar_url: safeAvatarUrl
         });
     } catch (error) {
         console.error('Error updating buyer profile:', error);

@@ -146,7 +146,7 @@ export const ProfileTab = () => {
     };
 
     return (
-        <div className="space-y-6 pb-12">
+        <div className="space-y-6 pb-16">
             <div className="border-b border-stone-100 pb-4">
                 <h2 className="text-xl font-display font-extrabold text-stone-900 flex items-center gap-2">
                     <User className="w-5 h-5 text-[#2A9D8F]" />
@@ -368,11 +368,11 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ปุ่มบันทึกอยู่ในฟอร์มและมีระยะห่างด้านล่างสวยงาม */}
-                <div className="pt-6 border-t border-stone-100 flex justify-end pb-8">
+                {/* ปุ่มบันทึกดีไซน์ใหม่ สีเขียวพรีเมียม ชัดเจน ไม่หาย */}
+                <div className="pt-6 border-t border-stone-100 flex justify-end pb-12">
                     <button
                         type="submit"
-                        className="btn-3d-botanical px-6 py-3 rounded-2xl text-xs font-bold text-white shadow-md flex items-center gap-2 hover:opacity-90 transition-all cursor-pointer bg-emerald-800 hover:bg-emerald-700"
+                        className="px-6 py-3 rounded-2xl text-xs font-bold text-white bg-[#2A9D8F] hover:bg-[#217A70] active:scale-95 shadow-lg flex items-center gap-2 transition-all cursor-pointer"
                     >
                         <Save className="w-4 h-4" />
                         <span>บันทึกข้อมูลโปรไฟล์</span>
