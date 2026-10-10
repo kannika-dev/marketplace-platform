@@ -28,17 +28,24 @@ export const ProfileTab = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const fileInputRef = useRef(null);
 
-    const userId = localStorage.getItem('userId') || '1';
+    // ดึง userId หรือดึงค่าสำรอง
+    const userId = localStorage.getItem('userId') || localStorage.getItem('user_id') || '1';
 
     useEffect(() => {
         const fetchProfile = async () => {
             try {
                 const token = localStorage.getItem('token');
+                if (!token) {
+                    setErrorMsg('⚠️ กรุณาเข้าสู่ระบบใหม่อีกครั้ง (ไม่พบ Token การใช้งาน)');
+                    return;
+                }
+
                 const response = await fetch(`${BACKEND_URL}/api/buyer/${userId}`, {
                     headers: {
-                        'Authorization': token ? `Bearer ${token}` : ''
+                        'Authorization': `Bearer ${token}`
                     }
                 });
+
                 const result = await response.json();
 
                 if (result.success && result.data) {
@@ -46,10 +53,12 @@ export const ProfileTab = () => {
                     if (result.data.avatar_url) {
                         setPreviewAvatar(result.data.avatar_url);
                     }
+                } else {
+                    setErrorMsg(`⚠️ ${result.message || 'ไม่สามารถโหลดข้อมูลโปรไฟล์ได้'}`);
                 }
             } catch (err) {
                 console.error('Failed to fetch profile:', err);
-                setErrorMsg('⚠️ ไม่สามารถโหลดข้อมูลโปรไฟล์จากฐานข้อมูลได้');
+                setErrorMsg('⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์');
             }
         };
 
@@ -100,7 +109,7 @@ export const ProfileTab = () => {
 
         if (profile.role === 'buyer') {
             if (!profile.phone || !profile.address_no || !profile.province || !profile.zipcode) {
-                setErrorMsg('⚠️ สำหรับผู้ซื้อ (Buyer) กรุณากรอกเบอร์โทรศัพท์และที่อยู่จัดส่งให้ครบถ้วนเพื่อใช้สำหรับระบบ Auto-Fill และการจัดส่งสินค้าค่ะ');
+                setErrorMsg('⚠️ สำหรับผู้ซื้อ (Buyer) กรุณากรอกเบอร์โทรศัพท์และที่อยู่จัดส่งให้ครบถ้วนเพื่อใช้สำหรับระบบ Auto-Fill ครับ/ค่ะ');
                 return;
             }
         }
@@ -130,7 +139,7 @@ export const ProfileTab = () => {
             const result = await response.json();
 
             if (result.success) {
-                setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ avatar_url ในฐานข้อมูลสำเร็จเรียบร้อยแล้ว!');
+                setSuccessMsg('✨ บันทึกข้อมูลโปรไฟล์สำเร็จเรียบร้อยแล้ว!');
                 if (result.avatar_url) {
                     setPreviewAvatar(result.avatar_url);
                     setProfile(prev => ({ ...prev, avatar_url: result.avatar_url }));
@@ -368,7 +377,7 @@ export const ProfileTab = () => {
                     </div>
                 </div>
 
-                {/* ปุ่มบันทึกดีไซน์ใหม่ สีเขียวพรีเมียม ชัดเจน ไม่หาย */}
+                {/* ปุ่มบันทึกดีไซน์ใหม่ สีเขียวพรีเมียม ชัดเจน */}
                 <div className="pt-6 border-t border-stone-100 flex justify-end pb-12">
                     <button
                         type="submit"

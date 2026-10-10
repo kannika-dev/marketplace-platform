@@ -1,9 +1,10 @@
 import db from '../config/db.js';
 
-// ดึงข้อมูลโปรไฟล์ผู้ซื้อ
+// ดึงข้อมูลโปรไฟล์ผู้ซื้อจาก Token หรือ ID
 export const getBuyerProfile = async (req, res) => {
     try {
-        const { userId } = req.params;
+        // ใช้ userId จาก URL หรือถ้ามียศจาก Token ให้ดึงตาม Token ได้เลย
+        const userId = req.params.userId || req.user?.id;
 
         const [rows] = await db.execute(
             'SELECT id, name, email, role, phone, address_no, subdistrict, district, province, zipcode, facebook, instagram, line_id, avatar_url FROM users WHERE id = ?',
@@ -27,7 +28,7 @@ export const getBuyerProfile = async (req, res) => {
 // อัปเดตข้อมูลโปรไฟล์และ avatar_url (ป้องกัน Error ด้วยการแปลง undefined เป็น null)
 export const updateBuyerProfile = async (req, res) => {
     try {
-        const { userId } = req.params;
+        const userId = req.params.userId || req.user?.id;
         const {
             name,
             phone,
@@ -43,10 +44,9 @@ export const updateBuyerProfile = async (req, res) => {
 
         let avatar_url = req.body.avatar_url || null;
         if (req.file && req.file.path) {
-            avatar_url = req.file.path; // ลิงก์รูปภาพปลอดภัยจาก Cloudinary
+            avatar_url = req.file.path;
         }
 
-        // ป้องกัน Error: Bind parameters must not contain undefined โดยการแปลงเป็น null
         const safeName = name ?? null;
         const safePhone = phone ?? null;
         const safeAddressNo = address_no ?? null;
@@ -82,7 +82,7 @@ export const updateBuyerProfile = async (req, res) => {
 
         res.status(200).json({
             success: true,
-            message: '✨ บันทึกข้อมูลโปรไฟล์และอัปเดตฟิลด์ avatar_url สำเร็จเรียบร้อยแล้ว!',
+            message: '✨ บันทึกข้อมูลโปรไฟล์สำเร็จเรียบร้อยแล้ว!',
             avatar_url: safeAvatarUrl
         });
     } catch (error) {
