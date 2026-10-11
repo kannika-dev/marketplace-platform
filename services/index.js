@@ -14,6 +14,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import shopRoutes from './routes/shopRoutes.js';
 import buyerRoutes from './routes/buyerRoutes.js';
+import wishlistRoutes from './routes/wishlistRoutes.js'; // 🌟 เพิ่ม Wishlist Routes
 
 dotenv.config();
 
@@ -240,7 +241,7 @@ const initDatabaseSchema = async () => {
     `);
 
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS craft_tracking_logs (
+      CREATE TABLE IF NOTICES craft_tracking_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         order_id INT NOT NULL,
         step VARCHAR(50) NOT NULL,
@@ -248,6 +249,19 @@ const initDatabaseSchema = async () => {
         notes TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_order_logs (order_id)
+      ) ENGINE=InnoDB;
+    `);
+
+    // 🌟 4. สร้างตาราง wishlists อัตโนมัติ (ป้องกันกรณีตารางยังไม่ถูกสร้าง)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS wishlists (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        product_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_user_product (user_id, product_id)
       ) ENGINE=InnoDB;
     `);
 
@@ -265,6 +279,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/shops', shopRoutes);
 app.use('/api/buyer', buyerRoutes);
+app.use('/api/wishlist', wishlistRoutes); // 🌟 5. ลงทะเบียน Endpoint Wishlist
 
 app.use((err, req, res, next) => {
   console.error('Unhandled Server Error:', err);

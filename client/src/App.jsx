@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Common Components
@@ -17,7 +17,7 @@ import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import SellerProfile from './pages/SellerProfile';
 
-// 🌟 Buyer Dashboard Pages (ใช้หน้าแดชบอร์ดผู้ซื้อรวมทุกแท็บแทน Orders เดิม)
+// Buyer Dashboard Pages
 import BuyerDashboard from './pages/buyer/BuyerDashboard';
 
 // Seller Pages
@@ -31,10 +31,6 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import ManageUsers from './pages/admin/ManageUsers';
 import VerifyPayments from './pages/admin/VerifyPayments';
 
-/**
- * Protected Route Component
- * Restricts access based on user authentication status and authorized roles
- */
 const ProtectedRoute = ({ allowedRoles, children }) => {
   const { user, role, loading } = useAuth();
 
@@ -46,17 +42,14 @@ const ProtectedRoute = ({ allowedRoles, children }) => {
     );
   }
 
-  // Not logged in -> Redirect to login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Admin has universal superuser access
   if (role === 'admin') {
     return children;
   }
 
-  // Check if role is authorized
   if (allowedRoles && !allowedRoles.includes(role)) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
@@ -98,7 +91,7 @@ export const App = () => {
               {/* Public Seller / Shop Profile */}
               <Route path="/seller/:id" element={<SellerProfile />} />
 
-              {/* Protected Buyer Routes (รวมทั้ง /buyer และ /orders ให้มาลงที่ BuyerDashboard) */}
+              {/* Protected Buyer Routes */}
               <Route
                 path="/buyer"
                 element={

@@ -1,30 +1,64 @@
-import React, { useState } from 'react';
-import { Heart, ShoppingBag, Trash2, ArrowRight, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Heart, ShoppingBag, Trash2 } from 'lucide-react';
+import axios from 'axios';
 
 export const WishlistTab = () => {
-    // จำลองข้อมูลรายการโปรด (Wishlist) ของงานคราฟต์
-    const [wishlistItems, setWishlistItems] = useState([
-        {
-            id: 1,
-            title: 'PANTN Aroma - เทียนหอมไขถั่วเหลืองธรรมชาติ',
-            artisan: 'Artisan Workshop',
-            price: 159,
-            image: 'https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?auto=format&fit=crop&w=400&q=80',
-            category: 'เทียนหอม & สกินแคร์'
-        },
-        {
-            id: 2,
-            title: 'กระเป๋าผ้าฝ้ายทอมือลายโบราณสุรินทร์',
-            artisan: 'กลุ่มทอผ้าพื้นถิ่น',
-            price: 490,
-            image: 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?auto=format&fit=crop&w=400&q=80',
-            category: 'เครื่องหนัง & Craft'
-        }
-    ]);
+    const [wishlistItems, setWishlistItems] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    const handleRemove = (id) => {
-        setWishlistItems((prev) => prev.filter((item) => item.id !== id));
+    // ฟังก์ชันดึงข้อมูลรายการโปรดจาก Backend
+    const fetchWishlist = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+
+            const response = await axios.get('http://localhost:5000/api/wishlist', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.data.success) {
+                setWishlistItems(response.data.data);
+            }
+        } catch (err) {
+            console.error('Error fetching wishlist:', err);
+            setError('ไม่สามารถโหลดรายการโปรดได้ในขณะนี้');
+        } finally {
+            setLoading(false);
+        }
     };
+
+    useEffect(() => {
+        fetchWishlist();
+    }, []);
+
+    // ฟังก์ชันลบสินค้าออกจากรายการโปรด (เรียกใช้ toggle endpoint หรือลบผ่าน API)
+    const handleRemove = async (productId) => {
+        try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const response = await axios.post(
+                'http://localhost:5000/api/wishlist/toggle',
+                { productId },
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+
+            if (response.data.success) {
+                // กรองเอาสินค้าที่ถูกลบออกจา State หน้าจอทันที
+                setWishlistItems((prev) => prev.filter((item) => (item.product_id || item.id) !== productId));
+            }
+        } catch (err) {
+            console.error('Error removing item:', err);
+            alert('เกิดข้อผิดพลาดในการลบสินค้าออกจาก Wishlist');
+        }
+    };
+
+    if (loading) {
+        return <div className="p-12 text-center text-stone-400 text-sm">กำลังโหลดรายการโปรดของคุณ...</div>;
+    }
+
+    if (error) {
+        return <div className="p-12 text-center text-rose-500 text-sm">{error}</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -48,39 +82,46 @@ export const WishlistTab = () => {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {wishlistItems.map((item) => (
-                        <div key={item.id} className="clay-card p-4 rounded-2xl border border-stone-200 bg-white/9ori flex gap-4 items-center relative group shadow-sm hover:shadow-md transition-all">
-                            <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
-                                <img src={item.image} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-[#2A9D8F] rounded-full font-bold">
-                                    {item.category}
-                                </span>
-                                <h4 className="text-xs font-bold text-stone-800 truncate mt-1">{item.title}</h4>
-                                <p className="text-[11px] text-stone-400">โดย {item.artisan}</p>
-                                <div className="flex items-center justify-between mt-2">
-                                    <span className="text-sm font-extrabold text-[#E76F51]">฿{item.price}</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <button
-                                            onClick={() => alert(`เพิ่ม ${item.title} ลงในตะกร้าแล้วจ้า!`)}
-                                            className="p-1.5 bg-[#1B4332] text-white rounded-lg hover:bg-[#2D6A4F] transition-colors"
-                                            title="หยิบใส่ตะกร้า"
-                                        >
-                                            <ShoppingBag className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleRemove(item.id)}
-                                            className="p-1.5 bg-stone-100 text-stone-500 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                            title="ลบออกจาก Wishlist"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
+                    {wishlistItems.map((item) => {
+                        const prodId = item.product_id || item.id;
+                        return (
+                            <div key={item.wishlist_id || prodId} className="clay-card p-4 rounded-2xl border border-stone-200 bg-white flex gap-4 items-center relative group shadow-sm hover:shadow-md transition-all">
+                                <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+                                    <img
+                                        src={item.image_url || 'https://via.placeholder.com/200'}
+                                        alt={item.title}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <span className="text-[10px] px-2 py-0.5 bg-emerald-50 text-[#2A9D8F] rounded-full font-bold">
+                                        {item.store_name || 'Artisan Workshop'}
+                                    </span>
+                                    <h4 className="text-xs font-bold text-stone-800 truncate mt-1">{item.title}</h4>
+                                    <p className="text-[11px] text-stone-400">ราคาคุ้มค่าจากช่างฝีมือ</p>
+                                    <div className="flex items-center justify-between mt-2">
+                                        <span className="text-sm font-extrabold text-[#E76F51]">฿{item.price}</span>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                onClick={() => alert(`เพิ่ม ${item.title} ลงในตะกร้าแล้วจ้า!`)}
+                                                className="p-1.5 bg-[#1B4332] text-white rounded-lg hover:bg-[#2D6A4F] transition-colors"
+                                                title="หยิบใส่ตะกร้า"
+                                            >
+                                                <ShoppingBag className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleRemove(prodId)}
+                                                className="p-1.5 bg-stone-100 text-stone-500 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                                title="ลบออกจาก Wishlist"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

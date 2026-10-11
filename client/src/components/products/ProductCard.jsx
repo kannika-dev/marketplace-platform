@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Sparkles, Heart, ArrowUpRight, Hammer } from 'lucide-react';
-import Badge from '../common/Badge';
+import axios from 'axios';
 
 export const ProductCard = ({ product }) => {
   const {
@@ -17,9 +17,70 @@ export const ProductCard = ({ product }) => {
   } = product;
 
   const displayImage = image_url || `https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=600&q=80`;
-
-  // Determine item type: HANDMADE (unique one-off) vs CRAFT (made-to-order studio)
   const isMadeToOrder = Boolean(is_made_to_order);
+
+  // สถานะเก็บว่าสินค้าชิ้นนี้ถูกกดหัวใจไว้หรือยัง
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // ตรวจสอบสถานะ Wishlist เบื้องต้นเมื่อโหลดคอมโพเนนต์
+  useEffect(() => {
+    const checkWishlistStatus = async () => {
+      try {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        if (!token) return;
+
+        const res = await axios.get('http://localhost:5000/api/wishlist', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.data.success && res.data.data) {
+          const found = res.data.data.some(item => (item.product_id || item.id) === id);
+          setIsWishlisted(found);
+        }
+      } catch (err) {
+        console.warn('Could not check wishlist status:', err.message);
+      }
+    };
+
+    checkWishlistStatus();
+  }, [id]);
+
+  // ฟังก์ชันกดปุ่มหัวใจ (Toggle Wishlist) พร้อมระบบความยืดหยุ่น
+  const handleToggleWishlist = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (loading) return;
+
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+    if (!token) {
+      alert('กรุณาเข้าสู่ระบบก่อนบันทึกรายการโปรด');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        'http://localhost:5000/api/wishlist/toggle',
+        { productId: id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        if (response.data.status === 'added') {
+          setIsWishlisted(true);
+        } else {
+          setIsWishlisted(false);
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling wishlist:', err);
+      alert('เกิดข้อผิดพลาดในการบันทึกรายการโปรด กรุณาลองใหม่อีกครั้ง');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="runway-card rounded-3xl overflow-hidden flex flex-col group relative bg-white border border-stone-200/80">
@@ -63,12 +124,17 @@ export const ProductCard = ({ product }) => {
           )}
         </div>
 
-        {/* Floating Wishlist Heart */}
+        {/* Floating Wishlist Heart (Interactive & Connected to DB) */}
         <button
-          className="absolute bottom-3.5 right-3.5 w-8 h-8 rounded-full bg-white/90 backdrop-blur-md text-stone-700 hover:text-rose-500 flex items-center justify-center transition-all shadow-md hover:scale-110 z-10"
-          title="บันทึก Handmade & Craft ที่ชื่นชอบ"
+          onClick={handleToggleWishlist}
+          disabled={loading}
+          className={`absolute bottom-3.5 right-3.5 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center transition-all shadow-md hover:scale-110 z-10 ${isWishlisted
+              ? 'bg-rose-500 text-white'
+              : 'bg-white/90 text-stone-700 hover:text-rose-500'
+            }`}
+          title={isWishlisted ? 'เอาออกจากรายการโปรด' : 'บันทึก Handmade & Craft ที่ชื่นชอบ'}
         >
-          <Heart className="w-4 h-4 hover:fill-rose-500" />
+          <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current text-white' : 'hover:fill-rose-500'}`} />
         </button>
       </div>
 
