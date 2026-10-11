@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, ShoppingBag, Trash2 } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
 import axios from 'axios';
 
 export const WishlistTab = () => {
     const [wishlistItems, setWishlistItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const { addToCart } = useAuth(); // ดึงฟังก์ชันเพิ่มสินค้าลงตะกร้าหลักมาใช้งาน
 
     // ฟังก์ชันดึงข้อมูลรายการโปรดจาก Backend
     const fetchWishlist = async () => {
@@ -32,7 +34,13 @@ export const WishlistTab = () => {
         fetchWishlist();
     }, []);
 
-    // ฟังก์ชันลบสินค้าออกจากรายการโปรด (เรียกใช้ toggle endpoint หรือลบผ่าน API)
+    // ฟังก์ชันเพิ่มสินค้าจาก Wishlist ลงตะกร้าหลัก
+    const handleAddToCartFromWishlist = (item) => {
+        addToCart(item, 1, item.selectedOptions || item.customization_notes);
+        alert(`✨ เพิ่ม "${item.title}" ลงในตะกร้าสินค้าเรียบร้อยแล้ว!`);
+    };
+
+    // ฟังก์ชันลบสินค้าออกจากรายการโปรด
     const handleRemove = async (productId) => {
         try {
             const craft_token = localStorage.getItem('craft_token') || sessionStorage.getItem('craft_token');
@@ -43,7 +51,6 @@ export const WishlistTab = () => {
             );
 
             if (response.data.success) {
-                // กรองเอาสินค้าที่ถูกลบออกจา State หน้าจอทันที
                 setWishlistItems((prev) => prev.filter((item) => (item.product_id || item.id) !== productId));
             }
         } catch (err) {
@@ -103,15 +110,15 @@ export const WishlistTab = () => {
                                         <span className="text-sm font-extrabold text-[#E76F51]">฿{item.price}</span>
                                         <div className="flex items-center gap-1.5">
                                             <button
-                                                onClick={() => alert(`เพิ่ม ${item.title} ลงในตะกร้าแล้วจ้า!`)}
-                                                className="p-1.5 bg-[#1B4332] text-white rounded-lg hover:bg-[#2D6A4F] transition-colors"
+                                                onClick={() => handleAddToCartFromWishlist(item)}
+                                                className="p-1.5 bg-[#1B4332] text-white rounded-lg hover:bg-[#2D6A4F] transition-colors cursor-pointer"
                                                 title="หยิบใส่ตะกร้า"
                                             >
                                                 <ShoppingBag className="w-3.5 h-3.5" />
                                             </button>
                                             <button
                                                 onClick={() => handleRemove(prodId)}
-                                                className="p-1.5 bg-stone-100 text-stone-500 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                                className="p-1.5 bg-stone-100 text-stone-500 rounded-lg hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
                                                 title="ลบออกจาก Wishlist"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
