@@ -9,10 +9,10 @@ export const getWishlist = async (req, res) => {
         }
 
         const query = `
-      SELECT w.id as wishlist_id, p.*, s.store_name 
+      SELECT w.id as wishlist_id, p.*, s.shop_name 
       FROM wishlists w
       JOIN products p ON w.product_id = p.id
-      LEFT JOIN shops s ON p.seller_id = s.user_id
+      LEFT JOIN shops s ON p.seller_id = s.seller_id
       WHERE w.user_id = ?
       ORDER BY w.created_at DESC
     `;
