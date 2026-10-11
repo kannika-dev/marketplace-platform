@@ -13,7 +13,7 @@ export const WishlistTab = () => {
             setLoading(true);
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
-            const response = await axios.get('http://localhost:5000/api/wishlist', {
+            const response = await axios.get('https://marketplace-platform-xh1q.onrender.com/api/wishlist', {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -37,7 +37,7 @@ export const WishlistTab = () => {
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
             const response = await axios.post(
-                'http://localhost:5000/api/wishlist/toggle',
+                'https://marketplace-platform-xh1q.onrender.com/api/wishlist/toggle',
                 { productId },
                 { headers: { Authorization: `Bearer ${token}` } }
             );

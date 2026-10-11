@@ -30,7 +30,7 @@ export const ProductCard = ({ product }) => {
         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
         if (!token) return;
 
-        const res = await axios.get('http://localhost:5000/api/wishlist', {
+        const res = await axios.get('https://marketplace-platform-xh1q.onrender.com/api/wishlist', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -62,7 +62,7 @@ export const ProductCard = ({ product }) => {
     try {
       setLoading(true);
       const response = await axios.post(
-        'http://localhost:5000/api/wishlist/toggle',
+        'https://marketplace-platform-xh1q.onrender.com/api/wishlist/toggle',
         { productId: id },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -129,8 +129,8 @@ export const ProductCard = ({ product }) => {
           onClick={handleToggleWishlist}
           disabled={loading}
           className={`absolute bottom-3.5 right-3.5 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center transition-all shadow-md hover:scale-110 z-10 ${isWishlisted
-              ? 'bg-rose-500 text-white'
-              : 'bg-white/90 text-stone-700 hover:text-rose-500'
+            ? 'bg-rose-500 text-white'
+            : 'bg-white/90 text-stone-700 hover:text-rose-500'
             }`}
           title={isWishlisted ? 'เอาออกจากรายการโปรด' : 'บันทึก Handmade & Craft ที่ชื่นชอบ'}
         >
