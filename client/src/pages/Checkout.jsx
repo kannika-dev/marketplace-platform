@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
 import {
   ShieldCheck,
-  Truck,
   CreditCard,
   Sparkles,
   Copy,
@@ -15,9 +14,10 @@ import {
   ArrowLeft,
   Lock,
   Leaf,
-  Clock,
   HeartHandshake,
-  Percent
+  Percent,
+  MapPin,
+  Phone
 } from 'lucide-react';
 
 export const Checkout = () => {
@@ -27,12 +27,28 @@ export const Checkout = () => {
   // Accordion active step (1: Address, 2: Payment, 3: Review)
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Form states
+  // Form states (ดึงค่าเริ่มต้นมาจากข้อมูล user ในหน้า Profile อัตโนมัติ)
   const [receiverName, setReceiverName] = useState(user?.name || '');
-  const [phoneNumber, setPhoneNumber] = useState('081-234-5678');
-  const [shippingAddress, setShippingAddress] = useState('');
-  const [postalCode, setPostalCode] = useState('10110');
+  const [phoneNumber, setPhoneNumber] = useState(user?.phone || '');
+  const [addressNo, setAddressNo] = useState(user?.address_no || '');
+  const [subdistrict, setSubdistrict] = useState(user?.subdistrict || '');
+  const [district, setDistrict] = useState(user?.district || '');
+  const [province, setProvince] = useState(user?.province || '');
+  const [postalCode, setPostalCode] = useState(user?.zipcode || '');
   const [note, setNote] = useState('');
+
+  // เมื่อข้อมูล user โหลดเสร็จ อัปเดต state ฟอร์มให้อัตโนมัติ
+  useEffect(() => {
+    if (user) {
+      if (!receiverName) setReceiverName(user.name || '');
+      if (!phoneNumber) setPhoneNumber(user.phone || '');
+      if (!addressNo) setAddressNo(user.address_no || '');
+      if (!subdistrict) setSubdistrict(user.subdistrict || '');
+      if (!district) setDistrict(user.district || '');
+      if (!province) setProvince(user.province || '');
+      if (!postalCode) setPostalCode(user.zipcode || '');
+    }
+  }, [user]);
 
   // Payment Type ('full' | 'deposit') & Method ('bank_transfer' | 'promptpay' | 'credit_card')
   const [paymentType, setPaymentType] = useState('full');
@@ -48,8 +64,6 @@ export const Checkout = () => {
   const [errorMsg, setErrorMsg] = useState('');
 
   const totalAmount = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
-
-  // คำนวณยอดมัดจำ (50% ของยอดรวม)
   const depositAmount = Math.round(totalAmount * 0.5);
   const payableNow = paymentType === 'deposit' ? depositAmount : totalAmount;
 
@@ -72,8 +86,8 @@ export const Checkout = () => {
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    if (!shippingAddress.trim() || !receiverName.trim()) {
-      setErrorMsg('กรุณากรอกชื่อผู้รับและที่อยู่สำหรับจัดส่งผลงานให้ครบถ้วน');
+    if (!addressNo.trim() || !receiverName.trim() || !phoneNumber.trim()) {
+      setErrorMsg('กรุณากรอกชื่อผู้รับ เบอร์โทร และที่อยู่จัดส่งให้ครบถ้วน');
       setCurrentStep(1);
       return;
     }
@@ -82,7 +96,8 @@ export const Checkout = () => {
     setErrorMsg('');
 
     try {
-      const fullAddressPayload = `${receiverName} (โทร: ${phoneNumber})\n${shippingAddress} รหัสไปรษณีย์ ${postalCode}`;
+      // ประกอบร่างที่อยู่แบบละเอียดส่งเข้า Backend
+      const fullAddressPayload = `${receiverName} (โทร: ${phoneNumber})\nบ้านเลขที่/ซอย: ${addressNo}\nตำบล/แขวง: ${subdistrict} อ.เภอ/เขต: ${district}\nจ. ${province} รหัสไปรษณีย์ ${postalCode}`;
 
       const orderPayload = {
         shipping_address: fullAddressPayload,
@@ -101,14 +116,10 @@ export const Checkout = () => {
       await createOrder(orderPayload);
       clearCart();
       alert(`✨ สร้างคำสั่งซื้อสำเร็จ! (${paymentType === 'deposit' ? 'เลือกชำระมัดจำ 50%' : 'ชำระเต็มจำนวน'}) กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);
-
-      // เด้งไปที่แท็บติดตามสินค้าใน Dashboard ของผู้ซื้อทันที
       navigate('/buyer-dashboard?tab=tracker');
     } catch (err) {
       console.error('Place order error:', err);
-      clearCart();
-      alert('สร้างคำสั่งซื้อสำเร็จในระบบ! กำลังพาท่านไปที่หน้าติดตามสินค้า');
-      navigate('/buyer-dashboard?tab=tracker');
+      setErrorMsg('เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +159,7 @@ export const Checkout = () => {
         {/* LEFT COLUMN: Modern 3-Step Visual Accordion (8 cols) */}
         <div className="lg:col-span-8 space-y-5">
 
-          {/* STEP 1: Shipping Address */}
+          {/* STEP 1: Shipping Address (Auto-filled from Profile) */}
           <div className={`clay-card rounded-3xl border transition-all overflow-hidden ${currentStep === 1 ? 'border-[#2A9D8F] ring-2 ring-[#2A9D8F]/20' : 'border-white'}`}>
             <button
               type="button"
@@ -156,15 +167,15 @@ export const Checkout = () => {
               className="w-full p-5 sm:p-6 text-left flex items-center justify-between bg-white/60 hover:bg-white/90 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
-                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm ${shippingAddress ? 'btn-3d-botanical text-white' : 'bg-stone-100 text-stone-600'}`}>
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm ${addressNo ? 'btn-3d-botanical text-white' : 'bg-stone-100 text-stone-600'}`}>
                   1
                 </div>
                 <div>
                   <h3 className="text-base font-display font-bold text-stone-900">
-                    ที่อยู่จัดส่งผลงาน (Shipping Information)
+                    ที่อยู่จัดส่งผลงาน (Shipping Information - Auto-filled)
                   </h3>
                   <p className="text-xs text-stone-500 font-normal">
-                    {shippingAddress ? `${receiverName} • ${shippingAddress.slice(0, 30)}...` : 'ระบุชื่อและที่อยู่สำหรับรับพัสดุงานคราฟต์'}
+                    {addressNo ? `${receiverName} • ${addressNo}, ${province}` : 'ดึงข้อมูลจากโปรไฟล์ของคุณอัตโนมัติ สามารถแก้ไขได้'}
                   </p>
                 </div>
               </div>
@@ -173,24 +184,27 @@ export const Checkout = () => {
 
             {currentStep === 1 && (
               <div className="p-6 sm:p-8 pt-2 border-t border-emerald-100/60 space-y-4 bg-white/40">
+                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-[11px] text-[#1B4332] flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#2A9D8F] shrink-0" />
+                  <span>ระบบดึงข้อมูลที่อยู่จากหน้าโปรไฟล์ของคุณมาเป็นค่าเริ่มต้นให้เรียบร้อย สามารถพิมพ์ปรับเปลี่ยนได้เฉพาะออเดอร์นี้ค่ะ</span>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-stone-700 block mb-1.5">ชื่อ-นามสกุล ผู้รับ *</label>
                     <input
                       type="text"
                       required
-                      placeholder="เช่น คุณกานต์ดา มั่งคั่ง"
                       value={receiverName}
                       onChange={(e) => setReceiverName(e.target.value)}
                       className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1.5">เบอร์โทรศัพท์ติดต่อ *</label>
+                    <label className="text-xs font-bold text-stone-700 block mb-1.5">เบอร์โทรศัพท์ติดต่อ (phone) *</label>
                     <input
                       type="tel"
                       required
-                      placeholder="08X-XXX-XXXX"
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
@@ -199,48 +213,77 @@ export const Checkout = () => {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1.5">ที่อยู่จัดส่งอย่างละเอียด *</label>
-                  <textarea
+                  <label className="text-xs font-bold text-stone-700 block mb-1.5">บ้านเลขที่ / ซอย / หมู่ (address_no) *</label>
+                  <input
+                    type="text"
                     required
-                    rows={3}
-                    placeholder="บ้านเลขที่, อาคาร, ซอย, ถนน, แขวง/ตำบล, เขต/อำเภอ, จังหวัด"
-                    value={shippingAddress}
-                    onChange={(e) => setShippingAddress(e.target.value)}
+                    value={addressNo}
+                    onChange={(e) => setAddressNo(e.target.value)}
                     className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1.5">รหัสไปรษณีย์</label>
+                    <label className="text-xs font-bold text-stone-700 block mb-1.5">ตำบล / แขวง (subdistrict)</label>
                     <input
                       type="text"
-                      placeholder="10110"
+                      value={subdistrict}
+                      onChange={(e) => setSubdistrict(e.target.value)}
+                      className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1.5">อำเภอ / เขต (district)</label>
+                    <input
+                      type="text"
+                      value={district}
+                      onChange={(e) => setDistrict(e.target.value)}
+                      className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1.5">จังหวัด (province)</label>
+                    <input
+                      type="text"
+                      value={province}
+                      onChange={(e) => setProvince(e.target.value)}
+                      className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-stone-700 block mb-1.5">รหัสไปรษณีย์ (zipcode)</label>
+                    <input
+                      type="text"
                       value={postalCode}
                       onChange={(e) => setPostalCode(e.target.value)}
                       className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-700 block mb-1.5">
-                      ข้อความเพิ่มเติมถึงช่างฝีมือ (Artisan Note)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="เช่น ห่อของขวัญ, สลักวันที่พิเศษ..."
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
-                    />
-                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-stone-700 block mb-1.5">
+                    ข้อความเพิ่มเติมถึงช่างฝีมือ (Artisan Note)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ห่อของขวัญ, สลักวันที่พิเศษ..."
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="w-full text-xs p-3.5 bg-white border border-emerald-200 rounded-2xl focus:outline-none focus:border-[#2A9D8F] shadow-xs"
+                  />
                 </div>
 
                 <div className="pt-2 flex justify-end">
                   <button
                     type="button"
                     onClick={() => {
-                      if (!shippingAddress.trim() || !receiverName.trim()) {
-                        alert('กรุณากรอกชื่อและที่อยู่ก่อนดำเนินการต่อ');
+                      if (!addressNo.trim() || !receiverName.trim() || !phoneNumber.trim()) {
+                        alert('กรุณากรอกชื่อ เบอร์โทร และที่อยู่ให้ครบถ้วนก่อนดำเนินการต่อ');
                         return;
                       }
                       setCurrentStep(2);
@@ -271,7 +314,7 @@ export const Checkout = () => {
                     รูปแบบและช่องทางการชำระเงิน (Payment Options)
                   </h3>
                   <p className="text-xs text-stone-500 font-normal">
-                    {paymentType === 'deposit' ? 'จ่ายมัดจำ 50% (รอร้านค้าอนุมัติคิวงาน)' : 'ชำระเต็มจำนวน'} • {paymentMethod === 'bank_transfer' ? 'โอนผ่านธนาคาร' : paymentMethod === 'promptpay' ? 'พร้อมเพย์' : 'บัตรเครดิต'}
+                    {paymentType === 'deposit' ? 'จ่ายมัดจำ 50%' : 'ชำระเต็มจำนวน'} • {paymentMethod === 'bank_transfer' ? 'โอนผ่านธนาคาร' : paymentMethod === 'promptpay' ? 'พร้อมเพย์' : 'บัตรเครดิต'}
                   </p>
                 </div>
               </div>
@@ -281,19 +324,14 @@ export const Checkout = () => {
             {currentStep === 2 && (
               <div className="p-6 sm:p-8 pt-2 border-t border-emerald-100/60 space-y-6 bg-white/40">
 
-                {/* 1. เลือกรูปแบบการจ่ายเงิน: มัดจำ vs เต็มจำนวน */}
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-stone-800 block">
                     เลือกรูปแบบการชำระเงินสำหรับงานแฮนด์เมด (Made-to-Order) *
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-                    {/* เต็มจำนวน */}
                     <div
                       onClick={() => setPaymentType('full')}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'full'
-                          ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm'
-                          : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'full' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'
                         }`}
                     >
                       <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${paymentType === 'full' ? 'bg-[#2A9D8F] text-white' : 'bg-stone-100 text-stone-400'}`}>
@@ -305,12 +343,9 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    {/* มัดจำ 50% */}
                     <div
                       onClick={() => setPaymentType('deposit')}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'deposit'
-                          ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm'
-                          : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'deposit' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'
                         }`}
                     >
                       <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${paymentType === 'deposit' ? 'bg-[#2A9D8F] text-white' : 'bg-stone-100 text-stone-400'}`}>
@@ -318,23 +353,17 @@ export const Checkout = () => {
                       </div>
                       <div>
                         <span className="text-xs font-bold text-stone-900 block">จ่ายมัดจำ 50% (Deposit)</span>
-                        <span className="text-[11px] text-stone-500 block mt-0.5">จ่ายมัดจำก่อน ฿{depositAmount.toLocaleString()} (ส่วนที่เหลือจ่ายก่อนส่งมอบ เมื่อร้านค้าอนุมัติคิวงาน)</span>
+                        <span className="text-[11px] text-stone-500 block mt-0.5">จ่ายมัดจำก่อน ฿{depositAmount.toLocaleString()} (ส่วนที่เหลือจ่ายก่อนส่งมอบ)</span>
                       </div>
                     </div>
-
                   </div>
                 </div>
 
                 <hr className="border-emerald-100" />
 
-                {/* 2. เลือกช่องทางชำระเงิน */}
                 <div className="space-y-3">
-                  <label className="text-xs font-bold text-stone-800 block">
-                    เลือกช่องทางชำระเงิน *
-                  </label>
+                  <label className="text-xs font-bold text-stone-800 block">เลือกช่องทางชำระเงิน *</label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-
-                    {/* Bank Transfer */}
                     <div
                       onClick={() => setPaymentMethod('bank_transfer')}
                       className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${paymentMethod === 'bank_transfer' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/50'}`}
@@ -351,7 +380,6 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    {/* PromptPay */}
                     <div
                       onClick={() => setPaymentMethod('promptpay')}
                       className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${paymentMethod === 'promptpay' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/50'}`}
@@ -368,7 +396,6 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    {/* Credit Card */}
                     <div
                       onClick={() => setPaymentMethod('credit_card')}
                       className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${paymentMethod === 'credit_card' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/50'}`}
@@ -384,16 +411,13 @@ export const Checkout = () => {
                         <span className="text-[10px] text-stone-500">Visa / Mastercard</span>
                       </div>
                     </div>
-
                   </div>
                 </div>
 
-                {/* Details ของช่องทางการชำระเงินที่เลือก */}
                 {paymentMethod === 'bank_transfer' && (
                   <div className="p-5 bg-gradient-to-r from-[#FFF9EC] to-[#FFE6A7]/40 rounded-2xl border border-[#FFE6A7] text-xs space-y-2.5">
                     <p className="font-bold text-[#9E6E00]">บัญชีธนาคารกลางสำหรับแพลตฟอร์ม Craftiverse</p>
                     <p className="text-stone-700 font-medium">ธนาคารกสิกรไทย (KBANK)</p>
-
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-base font-extrabold text-stone-900 bg-white px-3 py-1.5 rounded-xl border border-amber-200 shadow-2xs">
                         098-2-34567-8
@@ -425,9 +449,6 @@ export const Checkout = () => {
                       <h4 className="text-sm font-display font-bold text-stone-900">
                         สแกน QR Code เพื่อชำระยอด ฿{payableNow.toLocaleString()}
                       </h4>
-                      <p className="text-[11px] text-stone-500">
-                        {paymentType === 'deposit' ? 'ยอดมัดจำ 50% สำหรับเริ่มต้นคิวงานแฮนด์เมด' : 'ชำระเต็มจำนวนเรียบร้อย'}
-                      </p>
                     </div>
                   </div>
                 )}
@@ -442,26 +463,6 @@ export const Checkout = () => {
                         onChange={(e) => setCardNumber(e.target.value)}
                         className="w-full text-xs p-3 bg-stone-50 border border-emerald-200 rounded-xl font-mono focus:outline-none focus:border-[#2A9D8F]"
                       />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs font-bold text-stone-700 block mb-1">วันหมดอายุ</label>
-                        <input
-                          type="text"
-                          value={cardExpiry}
-                          onChange={(e) => setCardExpiry(e.target.value)}
-                          className="w-full text-xs p-3 bg-stone-50 border border-emerald-200 rounded-xl font-mono focus:outline-none focus:border-[#2A9D8F]"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-stone-700 block mb-1">CVC / CVV</label>
-                        <input
-                          type="text"
-                          value={cardCvc}
-                          onChange={(e) => setCardCvc(e.target.value)}
-                          className="w-full text-xs p-3 bg-stone-50 border border-emerald-200 rounded-xl font-mono focus:outline-none focus:border-[#2A9D8F]"
-                        />
-                      </div>
                     </div>
                   </div>
                 )}
@@ -512,7 +513,7 @@ export const Checkout = () => {
                     <span>เงื่อนไขงาน Made-to-Order และการติดตามสินค้า</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-stone-600">
-                    เมื่อกดยืนยันคำสั่งซื้อแล้ว คำสั่งซื้อจะถูกส่งไปยังช่างฝีมือเพื่อตรวจสอบคิวงานและอนุมัติรูปแบบการชำระเงิน ({paymentType === 'deposit' ? 'มัดจำ 50%' : 'เต็มจำนวน'}) ระบบจะนำคุณไปยังหน้า <strong>"ติดตามสินค้า (Craft Tracker)"</strong> เพื่อตรวจสอบสถานะและแนบสลิปชำระเงินในสเต็ปถัดไปค่ะ
+                    เมื่อกดยืนยันคำสั่งซื้อแล้ว ระบบจะนำคุณไปยังหน้า <strong>"ติดตามสินค้า (Craft Tracker)"</strong> ทันทีค่ะ
                   </p>
                 </div>
 
@@ -536,7 +537,6 @@ export const Checkout = () => {
         {/* RIGHT COLUMN: Sticky Invoice Preview Card (4 cols) */}
         <div className="lg:col-span-4 sticky top-24 space-y-4">
           <div className="clay-card p-6 sm:p-7 rounded-3xl border border-white shadow-xl space-y-5 bg-white/95 backdrop-blur-md">
-
             <div className="border-b border-emerald-100 pb-3">
               <h3 className="text-lg font-display font-extrabold text-stone-900">
                 สรุปรายการสินค้า ({cart.length} ชิ้น)
@@ -544,7 +544,6 @@ export const Checkout = () => {
               <span className="text-[11px] text-stone-400 font-medium">Invoice Preview</span>
             </div>
 
-            {/* Items List */}
             <div className="space-y-3 max-h-60 overflow-y-auto pr-1 divide-y divide-emerald-50">
               {cart.map((item, idx) => (
                 <div key={idx} className="pt-3 first:pt-0 flex items-center justify-between gap-3 text-xs">
@@ -566,7 +565,6 @@ export const Checkout = () => {
               ))}
             </div>
 
-            {/* Price Calculations */}
             <div className="border-t border-emerald-100 pt-3.5 space-y-2 text-xs font-medium text-stone-600">
               <div className="flex justify-between">
                 <span>ยอดรวมสินค้าทั้งหมด</span>
@@ -591,18 +589,15 @@ export const Checkout = () => {
               </div>
             </div>
 
-            {/* Eco Packaging Badge */}
             <div className="p-3.5 bg-[#E8F7F3] rounded-2xl border border-[#A2D9D2] flex items-center gap-2 text-[11px] text-[#1B4332] font-semibold">
               <Leaf className="w-4 h-4 text-[#2A9D8F] shrink-0" />
               <span>บรรจุด้วยกล่องรังผึ้งและ Eco-Cushion ปลดพลาสติก 100%</span>
             </div>
 
-            {/* Guarantee */}
             <div className="text-[11px] text-stone-400 flex items-center justify-center gap-1.5 font-medium">
               <ShieldCheck className="w-4 h-4 text-[#2A9D8F]" />
               <span>คุ้มครองคำสั่งซื้อโดย Craftiverse Guarantee</span>
             </div>
-
           </div>
         </div>
 
