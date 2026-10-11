@@ -27,11 +27,11 @@ export const ProductCard = ({ product }) => {
   useEffect(() => {
     const checkWishlistStatus = async () => {
       try {
-        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-        if (!token) return;
+        const craft_token = localStorage.getItem('craft_token') || sessionStorage.getItem('craft_token');
+        if (!craft_token) return;
 
         const res = await axios.get('https://marketplace-platform-xh1q.onrender.com/api/wishlist', {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${craft_token}` }
         });
 
         if (res.data.success && res.data.data) {
@@ -53,8 +53,8 @@ export const ProductCard = ({ product }) => {
 
     if (loading) return;
 
-    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-    if (!token) {
+    const craft_token = localStorage.getItem('craft_token') || sessionStorage.getItem('craft_token');
+    if (!craft_token) {
       alert('กรุณาเข้าสู่ระบบก่อนบันทึกรายการโปรด');
       return;
     }
@@ -64,7 +64,7 @@ export const ProductCard = ({ product }) => {
       const response = await axios.post(
         'https://marketplace-platform-xh1q.onrender.com/api/wishlist/toggle',
         { productId: id },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${craft_token}` } }
       );
 
       if (response.data.success) {
