@@ -8,7 +8,7 @@ export const createOrder = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const buyerId = req.user.id;
-    const { items, shipping_address } = req.body;
+    const { items, shipping_address, note, payment_type, payment_method, deposit_amount, remaining_balance } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
@@ -45,11 +45,24 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Insert order master (status: 'unpaid')
+    // คำนวณยอดมัดจำและยอดคงเหลือกรณีเลือกแบบ deposit
+    const selectedPaymentType = payment_type || 'full';
+    const calculatedDeposit = selectedPaymentType === 'deposit' ? Math.round(totalAmount * 0.5) : totalAmount;
+    const calculatedRemaining = selectedPaymentType === 'deposit' ? (totalAmount - calculatedDeposit) : 0;
+
+    // Insert order master (status: 'unpaid') พร้อมรองรับฟิลด์มัดจำและรูปแบบการจ่ายเงิน
     const [orderResult] = await connection.query(
-      `INSERT INTO orders (buyer_id, total_amount, status, shipping_address, created_at)
-       VALUES (?, ?, 'unpaid', ?, NOW())`,
-      [buyerId, totalAmount, shipping_address || '']
+      `INSERT INTO orders (buyer_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
+       VALUES (?, ?, 'unpaid', ?, ?, ?, ?, ?, NOW())`,
+      [
+        buyerId,
+        totalAmount,
+        shipping_address || '',
+        selectedPaymentType,
+        payment_method || 'bank_transfer',
+        calculatedDeposit,
+        calculatedRemaining
+      ]
     );
 
     const orderId = orderResult.insertId;
@@ -66,7 +79,7 @@ export const createOrder = async (req, res) => {
     // Insert initial craft timeline log
     await connection.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, created_at)
-       VALUES (?, 'order_placed', 'คำสั่งซื้อถูกส่งเรียบร้อย', 'รอการชำระเงินและตรวจสอบสลิป', NOW())`,
+       VALUES (?, 'order_placed', 'คำสั่งซื้อถูกส่งเรียบร้อย', 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน', NOW())`,
       [orderId]
     );
 
@@ -78,6 +91,8 @@ export const createOrder = async (req, res) => {
       data: {
         orderId,
         totalAmount,
+        payment_type: selectedPaymentType,
+        deposit_amount: calculatedDeposit,
         status: 'unpaid'
       }
     });
@@ -151,7 +166,6 @@ export const getOrderById = async (req, res) => {
 
     // Authorization check
     if (userRole !== 'admin' && order.buyer_id !== userId) {
-      // Check if user is seller of this order's products
       const [sellerItems] = await pool.query(
         `SELECT oi.id 
          FROM order_items oi
