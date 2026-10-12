@@ -25,7 +25,7 @@ export const getSellerDashboardStats = async (req, res) => {
     );
 
     const [activeOrders] = await pool.query(
-      `SELECT o.id, o.status, o.created_at, p.title as product_title, oi.quantity,
+      `SELECT o.id, o.status, o.craft_status, o.created_at, p.title as product_title, oi.quantity,
               u.name as buyer_name, u.email as buyer_email
        FROM order_items oi
        JOIN products p ON oi.product_id = p.id
@@ -751,7 +751,7 @@ export const getSellerOrders = async (req, res) => {
   try {
     const sellerId = req.user.id;
     const [orders] = await pool.query(
-      `SELECT DISTINCT o.id, o.buyer_id, o.status, o.total_amount, 
+      `SELECT DISTINCT o.id, o.buyer_id, o.status, o.payment_status, o.craft_status, o.total_amount, 
               o.shipping_address, o.payment_slip_url, o.created_at, u.name as buyer_name, u.email as buyer_email
        FROM orders o
        JOIN order_items oi ON o.id = oi.order_id
@@ -781,21 +781,32 @@ export const getSellerOrders = async (req, res) => {
 
 /**
  * Update craft journey / production status
+ * (อัปเดตเฉพาะ craft_status และบันทึก Log ลง craft_tracking_logs โดยไม่กระทบสถานะการชำระเงิน)
  */
 export const updateCraftStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { craft_status, step_title, note } = req.body;
 
-    await pool.query('UPDATE orders SET status = ? WHERE id = ?', [craft_status, orderId]);
+    // 1. อัปเดตเฉพาะ craft_status ในตาราง orders
+    await pool.query(
+      'UPDATE orders SET craft_status = ? WHERE id = ?',
+      [craft_status, orderId]
+    );
+
+    // 2. บันทึกประวัติสเต็ปงานคราฟต์ลงตาราง craft_tracking_logs สำหรับแสดงไทม์ไลน์
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, created_at)
        VALUES (?, ?, ?, ?, NOW())`,
       [orderId, craft_status, step_title || craft_status, note || '']
     );
 
-    return res.json({ success: true, message: 'Status updated' });
+    return res.json({
+      success: true,
+      message: 'อัปเดตสเต็ปงานคราฟต์เรียบร้อยแล้ว'
+    });
   } catch (error) {
+    console.error('updateCraftStatus Error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
