@@ -50,13 +50,14 @@ export const createOrder = async (req, res) => {
     const calculatedDeposit = selectedPaymentType === 'deposit' ? Math.round(totalAmount * 0.5) : totalAmount;
     const calculatedRemaining = selectedPaymentType === 'deposit' ? (totalAmount - calculatedDeposit) : 0;
 
-    // Insert order master (status: 'unpaid') พร้อมรองรับฟิลด์มัดจำและรูปแบบการจ่ายเงิน
+    // Insert order master (จัดเรียงลำดับคอลัมน์และค่าพารามิเตอร์ให้ตรงกันเป๊ะ 100%)
     const [orderResult] = await connection.query(
       `INSERT INTO orders (buyer_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
-       VALUES (?, ?, 'unpaid', ?, ?, ?, ?, ?, NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         buyerId,
         totalAmount,
+        'unpaid',
         shipping_address || '',
         selectedPaymentType,
         payment_method || 'bank_transfer',
