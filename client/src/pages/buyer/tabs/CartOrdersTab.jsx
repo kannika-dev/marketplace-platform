@@ -1,44 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Package, Upload, CheckCircle2, Clock, Trash2, ArrowRight, Tag, Plus, Minus, ShieldCheck, Leaf, Sparkles, Truck } from 'lucide-react';
+import { ShoppingCart, Package, Upload, ArrowRight, Plus, Minus, Trash2, Truck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
-import axios from 'axios';
+import { getMyOrders, uploadPaymentSlip } from '../../../services/orderService';
 
-export const CartOrdersTab = () => {
-    // -----------------------------------------------------------------
-    // State สลับแท็บย่อย: 'cart' (ตะกร้าสินค้า) หรือ 'orders' (ประวัติคำสั่งซื้อ)
-    // -----------------------------------------------------------------
+export const CartOrdersTab = ({ onSelectTab }) => {
     const [activeSubTab, setActiveSubTab] = useState('cart');
-
-    // Context ตะกร้าสินค้า
     const { cart, removeFromCart, clearCart, addToCart } = useAuth();
     const navigate = useNavigate();
 
-    // State ส่วนคำนวณราคาในตะกร้า
     const [couponCode, setCouponCode] = useState('');
     const [discount, setDiscount] = useState(0);
-    const [couponApplied, setCouponApplied] = useState(false);
-
-    // State ฝั่งประวัติคำสั่งซื้อ (Orders API)
     const [orders, setOrders] = useState([]);
     const [loadingOrders, setLoadingOrders] = useState(true);
 
-    const API_BASE = 'https://marketplace-platform-xh1q.onrender.com/api';
-
-    // คำนวณราคายอดรวมตะกร้า
     const totalAmount = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
     const finalAmount = Math.max(0, totalAmount - discount);
 
-    // ดึงประวัติคำสั่งซื้อจาก Backend
     const fetchOrders = async () => {
         try {
             setLoadingOrders(true);
-            const craft_token = localStorage.getItem('craft_token') || sessionStorage.getItem('craft_token');
-            const response = await axios.get(`${API_BASE}/orders/my-orders`, {
-                headers: { Authorization: `Bearer ${craft_token}` }
-            });
-            if (response.data.success) {
-                setOrders(response.data.data);
+            const res = await getMyOrders();
+            if (res.success) {
+                setOrders(res.data);
             }
         } catch (err) {
             console.error('Error fetching orders:', err);
@@ -60,36 +44,13 @@ export const CartOrdersTab = () => {
         }
     };
 
-    const handleApplyCoupon = (e) => {
-        e.preventDefault();
-        if (couponCode.trim().toUpperCase() === 'CRAFT10') {
-            setDiscount(Math.round(totalAmount * 0.1));
-            setCouponApplied(true);
-        } else if (couponCode.trim().toUpperCase() === 'FIRSTBUY') {
-            setDiscount(150);
-            setCouponApplied(true);
-        } else if (couponCode.trim()) {
-            alert('โค้ดส่วนลดไม่ถูกต้องหรือหมดอายุ (ลองใช้: CRAFT10 หรือ FIRSTBUY)');
-        }
-    };
-
     const handleUploadSlip = async (orderId, event) => {
         const file = event.target.files[0];
         if (!file) return;
 
         try {
-            const craft_token = localStorage.getItem('craft_token') || sessionStorage.getItem('craft_token');
-            const formData = new FormData();
-            formData.append('slip', file);
-
-            const response = await axios.post(`${API_BASE}/orders/${orderId}/upload-slip`, formData, {
-                headers: {
-                    Authorization: `Bearer ${craft_token}`,
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
-
-            if (response.data.success) {
+            const res = await uploadPaymentSlip(orderId, file);
+            if (res.success) {
                 alert('✨ อัปโหลดสลิปสำเร็จ! รอแอดมินตรวจสอบการชำระเงินสักครู่นะคะ');
                 fetchOrders();
             }
@@ -101,7 +62,6 @@ export const CartOrdersTab = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header + ปุ่มสลับแท็บย่อย */}
             <div className="border-b border-stone-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 className="text-xl font-display font-extrabold text-stone-900 flex items-center gap-2">
@@ -109,36 +69,29 @@ export const CartOrdersTab = () => {
                         ตะกร้าและคำสั่งซื้อของฉัน (Cart & Orders)
                     </h2>
                     <p className="text-xs text-stone-500 mt-1">
-                        จัดการสินค้าในตะกร้า และตรวจสอบสถานะคำสั่งซื้อของคุณ[cite: 22]
+                        จัดการสินค้าในตะกร้า และตรวจสอบสถานะคำสั่งซื้อของคุณ
                     </p>
                 </div>
 
-                {/* สวิตช์เลือกแท็บย่อย */}
                 <div className="flex items-center p-1 bg-stone-100 rounded-2xl w-fit">
                     <button
                         onClick={() => setActiveSubTab('cart')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'cart'
-                                ? 'bg-white text-[#2A9D8F] shadow-sm'
-                                : 'text-stone-500 hover:text-stone-800'
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'cart' ? 'bg-white text-[#2A9D8F] shadow-sm' : 'text-stone-500 hover:text-stone-800'
                             }`}
                     >
-                        🛒 ตะกร้าสินค้า ({cart.reduce((t, i) => t + i.quantity, 0)})[cite: 22]
+                        🛒 ตะกร้าสินค้า ({cart.reduce((t, i) => t + i.quantity, 0)})
                     </button>
                     <button
                         onClick={() => setActiveSubTab('orders')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'orders'
-                                ? 'bg-white text-[#2A9D8F] shadow-sm'
-                                : 'text-stone-500 hover:text-stone-800'
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeSubTab === 'orders' ? 'bg-white text-[#2A9D8F] shadow-sm' : 'text-stone-500 hover:text-stone-800'
                             }`}
                     >
-                        📦 คำสั่งซื้อของฉัน ({orders.length})[cite: 22]
+                        📦 คำสั่งซื้อของฉัน ({orders.length})
                     </button>
                 </div>
             </div>
 
-            {/* ========================================================================= */}
-            {/* TAB 1: ตะกร้าสินค้า (CART)                                                */}
-            {/* ========================================================================= */}
+            {/* TAB 1: CART */}
             {activeSubTab === 'cart' && (
                 <div>
                     {cart.length === 0 ? (
@@ -147,7 +100,7 @@ export const CartOrdersTab = () => {
                                 <ShoppingCart className="w-10 h-10 stroke-1" />
                             </div>
                             <h3 className="text-lg font-bold text-stone-800">ตะกร้าของคุณยังว่างเปล่า</h3>
-                            <p className="text-xs text-stone-500">เลือกกดสั่งซื้อสินค้าจากหน้าหลัก หรือจากหน้ารายการโปรดได้เลยจ้า</p>
+                            <p className="text-xs text-stone-500">เลือกกดสั่งซื้อสินค้าจากหน้าหลักได้เลยจ้า</p>
                             <Link to="/products" className="inline-flex items-center gap-2 px-6 py-3 rounded-xl btn-3d-peach text-xs font-bold shadow-md">
                                 <span>ไปเลือกชมสินค้า</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
@@ -155,7 +108,6 @@ export const CartOrdersTab = () => {
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                            {/* รายการสินค้าในตะกร้า */}
                             <div className="lg:col-span-8 space-y-4">
                                 <div className="flex justify-between items-center text-xs text-stone-500 font-medium pb-1">
                                     <span>รายการสินค้าที่เลือกไว้ ({cart.length} รายการ)</span>
@@ -194,13 +146,11 @@ export const CartOrdersTab = () => {
                                 })}
                             </div>
 
-                            {/* สรุปคำสั่งซื้อ */}
                             <div className="lg:col-span-4 clay-card p-5 rounded-2xl border border-stone-100 bg-white space-y-4">
                                 <h3 className="text-sm font-bold text-stone-900 border-b border-stone-100 pb-2">สรุปรายการสั่งซื้อ</h3>
                                 <div className="space-y-2 text-xs text-stone-600">
                                     <div className="flex justify-between"><span>ยอดรวมสินค้า</span><span className="font-bold">฿{totalAmount.toLocaleString()}</span></div>
                                     <div className="flex justify-between text-[#2A9D8F]"><span>ค่าจัดส่ง</span><span className="font-bold">ฟรี</span></div>
-                                    {discount > 0 && <div className="flex justify-between text-[#E76F51]"><span>ส่วนลด</span><span>-฿{discount.toLocaleString()}</span></div>}
                                 </div>
 
                                 <div className="border-t border-stone-100 pt-3 flex justify-between items-baseline">
@@ -218,17 +168,15 @@ export const CartOrdersTab = () => {
                 </div>
             )}
 
-            {/* ========================================================================= */}
-            {/* TAB 2: ประวัติคำสั่งซื้อ (ORDERS)                                         */}
-            {/* ========================================================================= */}
+            {/* TAB 2: ORDERS */}
             {activeSubTab === 'orders' && (
                 <div>
                     {loadingOrders ? (
-                        <div className="text-center py-16 text-stone-400 text-xs">กำลังโหลดประวัติคำสั่งซื้อ...[cite: 22]</div>
+                        <div className="text-center py-16 text-stone-400 text-xs">กำลังโหลดประวัติคำสั่งซื้อ...</div>
                     ) : orders.length === 0 ? (
                         <div className="text-center py-16 text-stone-400 space-y-3">
                             <Package className="w-12 h-12 mx-auto stroke-1" />
-                            <p className="text-xs">ยังไม่มีรายการคำสั่งซื้อในระบบ[cite: 22]</p>
+                            <p className="text-xs">ยังไม่มีรายการคำสั่งซื้อในระบบ</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -236,33 +184,30 @@ export const CartOrdersTab = () => {
                                 <div key={order.id} className="clay-card p-5 rounded-2xl border border-stone-100 bg-white shadow-sm space-y-3">
                                     <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-stone-100 text-xs">
                                         <div>
-                                            <span className="font-bold text-stone-900">คำสั่งซื้อ #{order.id}[cite: 22]</span>
-                                            <span className="text-stone-400 ml-2">({new Date(order.created_at).toLocaleString('th-TH')})[cite: 22]</span>
+                                            <span className="font-bold text-stone-900">คำสั่งซื้อ #{order.id}</span>
+                                            <span className="text-stone-400 ml-2">({new Date(order.created_at).toLocaleString('th-TH')})</span>
                                         </div>
                                         <span className="px-2.5 py-1 rounded-full text-[11px] font-bold border bg-amber-50 text-amber-700 border-amber-200">
-                                            {order.status}[cite: 22]
+                                            {order.status}
                                         </span>
                                     </div>
 
                                     <div className="space-y-2">
                                         {order.items && order.items.map((item) => (
                                             <div key={item.id} className="flex justify-between items-center text-xs p-2 rounded-xl bg-stone-50">
-                                                <span>{item.title || item.product_name}[cite: 22]</span>
-                                                <span className="font-bold">฿{Number(item.price).toLocaleString()} x {item.quantity}[cite: 22]</span>
+                                                <span>{item.title || item.product_name}</span>
+                                                <span className="font-bold">฿{Number(item.price).toLocaleString()} x {item.quantity}</span>
                                             </div>
                                         ))}
                                     </div>
 
                                     <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-stone-100 text-xs">
-                                        <span className="text-stone-500">ยอดรวมสุทธิ: <strong className="text-[#2A9D8F]">฿{Number(order.total_amount).toLocaleString()}</strong>[cite: 22]</span>
+                                        <span className="text-stone-500">ยอดรวมสุทธิ: <strong className="text-[#2A9D8F]">฿{Number(order.total_amount).toLocaleString()}</strong></span>
 
                                         <div className="flex items-center gap-2">
-                                            {/* ปุ่มทางลัดไปหน้า Craft Tracker (แท็บติดตามสินค้า) */}
                                             <button
                                                 onClick={() => {
-                                                    // สมมติส่ง event หรือเปลี่ยนหน้าไปแท็บ Craft Tracker ตามระบบแดชบอร์ดเตง
-                                                    const trackerTabBtn = document.querySelector('[data-tab="tracker"]');
-                                                    if (trackerTabBtn) trackerTabBtn.click();
+                                                    if (onSelectTab) onSelectTab('tracker');
                                                     else navigate('/buyer-dashboard?tab=tracker');
                                                 }}
                                                 className="px-3 py-1.5 bg-[#E8F7F3] text-[#2A9D8F] hover:bg-[#D8F3DC] rounded-xl text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
@@ -274,7 +219,7 @@ export const CartOrdersTab = () => {
                                             {order.status === 'unpaid' && (
                                                 <label className="btn-3d-botanical px-3 py-1.5 rounded-xl text-xs font-bold text-white cursor-pointer flex items-center gap-1">
                                                     <Upload className="w-3 h-3" />
-                                                    <span>แนบสลิป[cite: 22]</span>
+                                                    <span>แนบสลิป</span>
                                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
                                                 </label>
                                             )}
