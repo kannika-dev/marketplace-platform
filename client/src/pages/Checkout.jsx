@@ -57,8 +57,6 @@ export const Checkout = () => {
 
   // Card mock state
   const [cardNumber, setCardNumber] = useState('•••• •••• •••• 4242');
-  const [cardExpiry, setCardExpiry] = useState('12/28');
-  const [cardCvc, setCardCvc] = useState('•••');
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -99,6 +97,7 @@ export const Checkout = () => {
       // ประกอบร่างที่อยู่แบบละเอียดส่งเข้า Backend
       const fullAddressPayload = `${receiverName} (โทร: ${phoneNumber})\nบ้านเลขที่/ซอย: ${addressNo}\nตำบล/แขวง: ${subdistrict} อ.เภอ/เขต: ${district}\nจ. ${province} รหัสไปรษณีย์ ${postalCode}`;
 
+      // ปรับปรุง Payload ให้ปลอดภัย ป้องกันค่า undefined หรือ object ว่างชนฐานข้อมูล
       const orderPayload = {
         shipping_address: fullAddressPayload,
         note: `[การชำระเงิน: ${paymentType === 'deposit' ? 'มัดจำ 50%' : 'ชำระเต็มจำนวน'}] ${note}`,
@@ -107,9 +106,9 @@ export const Checkout = () => {
         deposit_amount: paymentType === 'deposit' ? depositAmount : totalAmount,
         remaining_balance: paymentType === 'deposit' ? (totalAmount - depositAmount) : 0,
         items: cart.map((item) => ({
-          product_id: item.id,
-          quantity: item.quantity,
-          customization_notes: item.selectedOptions || {}
+          product_id: item.id || item.product_id,
+          quantity: Number(item.quantity) || 1,
+          customization_notes: item.selectedOptions ? JSON.stringify(item.selectedOptions) : (item.customization_notes || null)
         }))
       };
 
@@ -119,7 +118,7 @@ export const Checkout = () => {
       navigate('/buyer-dashboard?tab=tracker');
     } catch (err) {
       console.error('Place order error:', err);
-      setErrorMsg('เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
+      setErrorMsg(err.response?.data?.message || 'เกิดข้อผิดพลาดในการสร้างคำสั่งซื้อ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setSubmitting(false);
     }
@@ -164,7 +163,7 @@ export const Checkout = () => {
             <button
               type="button"
               onClick={() => setCurrentStep(1)}
-              className="w-full p-5 sm:p-6 text-left flex items-center justify-between bg-white/60 hover:bg-white/90 transition-colors cursor-pointer"
+              className="w-full p-5 sm:p-6 text-left flex items-center justify-between bg-white/60 hover:bg-white/95 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
                 <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm ${addressNo ? 'btn-3d-botanical text-white' : 'bg-stone-100 text-stone-600'}`}>
@@ -303,7 +302,7 @@ export const Checkout = () => {
             <button
               type="button"
               onClick={() => setCurrentStep(2)}
-              className="w-full p-5 sm:p-6 text-left flex items-center justify-between bg-white/60 hover:bg-white/90 transition-colors cursor-pointer"
+              className="w-full p-5 sm:p-6 text-left flex items-center justify-between bg-white/60 hover:bg-white/95 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
                 <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm ${paymentMethod ? 'btn-3d-botanical text-white' : 'bg-stone-100 text-stone-600'}`}>
@@ -331,8 +330,7 @@ export const Checkout = () => {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div
                       onClick={() => setPaymentType('full')}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'full' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'
-                        }`}
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'full' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'}`}
                     >
                       <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${paymentType === 'full' ? 'bg-[#2A9D8F] text-white' : 'bg-stone-100 text-stone-400'}`}>
                         <CreditCard className="w-3.5 h-3.5" />
@@ -345,8 +343,7 @@ export const Checkout = () => {
 
                     <div
                       onClick={() => setPaymentType('deposit')}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'deposit' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'
-                        }`}
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'deposit' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'}`}
                     >
                       <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${paymentType === 'deposit' ? 'bg-[#2A9D8F] text-white' : 'bg-stone-100 text-stone-400'}`}>
                         <Percent className="w-3.5 h-3.5" />
@@ -487,7 +484,7 @@ export const Checkout = () => {
             <button
               type="button"
               onClick={() => setCurrentStep(3)}
-              className="w-full p-5 sm:p-6 text-left flex items-center justify-between bg-white/60 hover:bg-white/90 transition-colors cursor-pointer"
+              className="w-full p-5 sm:p-6 text-left flex items-center justify-between bg-white/60 hover:bg-white/95 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
                 <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm ${currentStep === 3 ? 'btn-3d-peach text-white' : 'bg-stone-100 text-stone-600'}`}>
