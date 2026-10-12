@@ -15,7 +15,7 @@ function Dashboard() {
   const [analytics, setAnalytics] = useState(null);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [reviews, setReviews] = useState([]); // State สำหรับเก็บข้อมูลรีวิว
+  const [reviews, setReviews] = useState([]);
   const [shopInfo, setShopInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -42,9 +42,9 @@ function Dashboard() {
       const [analyticsRes, productsRes, ordersRes, shopRes, reviewsRes] = await Promise.allSettled([
         api.get(`/shops/analytics/${currentUser.id}`),
         api.get(`/seller/products`),
-        api.get(`/orders/seller/${currentUser.id}`),
+        api.get(`/seller/orders`), // ใช้ API สั่งดึงออเดอร์ของผู้ขายโดยตรง
         api.get(`/shops/seller/${currentUser.id}`),
-        api.get(`/seller/reviews`) // ดึงข้อมูลรีวิวของร้านค้า
+        api.get(`/seller/reviews`)
       ]);
 
       if (analyticsRes.status === 'fulfilled') {
@@ -84,13 +84,19 @@ function Dashboard() {
     return () => clearTimeout(fallbackTimer);
   }, [currentUser]);
 
-  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+  // ฟังก์ชันอัปเดตสเต็ปงานคราฟต์ตรงเข้า API /seller/orders/:orderId/craft-status
+  const handleUpdateOrderStatus = async (orderId, newStatus, stepTitle) => {
     try {
-      await api.put(`/orders/${orderId}/status`, { status: newStatus });
-      alert('อัปเดตสถานะเรียบร้อยแล้ว!');
+      await api.patch(`/seller/orders/${orderId}/craft-status`, {
+        craft_status: newStatus,
+        step_title: stepTitle || (newStatus === 'completed' ? 'ประดิษฐ์เสร็จสิ้น' : 'กำลังขึ้นรูปประดิษฐ์'),
+        note: newStatus === 'completed' ? 'ชิ้นงานสร้างสรรค์เสร็จสมบูรณ์ พร้อมจัดส่ง' : 'เริ่มกระบวนการประดิษฐ์ชิ้นงาน'
+      });
+      alert('✨ อัปเดตสเต็ปงานคราฟต์เรียบร้อยแล้ว!');
       fetchDashboardData();
     } catch (err) {
-      alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ');
+      console.error('Update craft status error:', err);
+      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ');
     }
   };
 
@@ -153,7 +159,6 @@ function Dashboard() {
     }
   };
 
-  // ฟังก์ชันส่งข้อความตอบกลับรีวิว
   const handleSendReviewReply = async (e) => {
     e.preventDefault();
     if (!activeReviewModal || !replyMessage.trim()) return;
@@ -164,7 +169,6 @@ function Dashboard() {
         reply_text: replyMessage.trim()
       });
 
-      // อัปเดตข้อมูลใน State ทันทีเพื่อให้แสดงผลสอดคล้องกัน
       setReviews(prevReviews =>
         prevReviews.map(r =>
           r.id === activeReviewModal.id
@@ -238,13 +242,13 @@ function Dashboard() {
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
             <button
               onClick={() => navigate('/seller/profile')}
-              className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl transition-all"
+              className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
             >
               แก้ไขโปรไฟล์ร้าน
             </button>
             <button
               onClick={() => navigate('/seller/add-product')}
-              className="bg-emerald-800 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-xs"
+              className="bg-emerald-800 hover:bg-emerald-700 text-white px-4 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" /> ลงขายงานชิ้นใหม่
             </button>
@@ -252,7 +256,7 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* การ์ดสถิติด้านบน (เพิ่มการ์ดรีวิว) */}
+      {/* การ์ดสถิติด้านบน */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div
           onClick={() => setActiveTab('revenue')}
@@ -299,7 +303,7 @@ function Dashboard() {
             <div className="p-2 rounded-xl bg-purple-100 text-purple-800"><Hammer className="w-5 h-5" /></div>
           </div>
           <span className="text-2xl font-extrabold text-stone-900 block">
-            {orders.filter(o => o.status === 'in_progress' || o.status === 'pending').length} ชิ้น
+            {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length} ชิ้น
           </span>
           <span className="text-[11px] text-purple-700 font-medium">ชิ้นงาน Handcrafted</span>
         </div>
@@ -337,7 +341,7 @@ function Dashboard() {
               </div>
               <div className="p-4 bg-stone-50 rounded-xl border border-stone-200">
                 <span className="text-xs text-stone-500 font-medium block">ออเดอร์ที่สำเร็จแล้ว</span>
-                <span className="text-xl font-bold text-stone-800">18 รายการ</span>
+                <span className="text-xl font-bold text-stone-800">{orders.filter(o => o.status === 'completed').length} รายการ</span>
               </div>
               <div className="p-4 bg-stone-50 rounded-xl border border-stone-200">
                 <span className="text-xs text-stone-500 font-medium block">อัตราการซื้อซ้ำ</span>
@@ -347,7 +351,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* TAB: รายการสินค้า (คลิกเพื่อแก้ไข) */}
+        {/* TAB: รายการสินค้า */}
         {activeTab === 'products' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -390,9 +394,17 @@ function Dashboard() {
 
         {activeTab === 'orders' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-bold flex items-center gap-2 text-stone-900">
-              <ShoppingBag className="w-5 h-5 text-blue-600" /> คำสั่งซื้อทั้งหมดจากลูกค้า
-            </h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold flex items-center gap-2 text-stone-900">
+                <ShoppingBag className="w-5 h-5 text-blue-600" /> คำสั่งซื้อทั้งหมดจากลูกค้า
+              </h3>
+              <button
+                onClick={() => navigate('/seller/orders')}
+                className="text-xs font-bold text-[#2A9D8F] hover:underline cursor-pointer"
+              >
+                ดูหน้าจัดการสเต็ปงานละเอียด &rarr;
+              </button>
+            </div>
             {orders.length === 0 ? (
               <div className="text-center py-10 bg-stone-50 rounded-xl text-stone-400 text-sm border border-stone-200">
                 ยังไม่มีคำสั่งซื้อเข้ามาในขณะนี้
@@ -407,9 +419,9 @@ function Dashboard() {
                     </div>
                     <div>
                       <span className={`text-xs px-3 py-1 rounded-full font-bold ${ord.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
-                        ord.status === 'in_progress' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-700'
+                        ord.status === 'crafting' || ord.status === 'in_progress' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-700'
                         }`}>
-                        {ord.status === 'completed' ? 'ทำเสร็จ/จัดส่งแล้ว' : ord.status === 'in_progress' ? 'กำลังประดิษฐ์' : 'รอดำเนินการ'}
+                        {ord.status === 'completed' ? 'ทำเสร็จ/จัดส่งแล้ว' : (ord.craft_status || ord.status)}
                       </span>
                     </div>
                   </div>
@@ -419,12 +431,19 @@ function Dashboard() {
           </div>
         )}
 
+        {/* TAB: ติดตามสถานะงานช่างฝีมือ */}
         {activeTab === 'craft' && (
           <div className="space-y-4">
-            <div>
+            <div className="flex justify-between items-center">
               <h3 className="text-lg font-bold flex items-center gap-2 text-purple-950">
                 <Hammer className="w-5 h-5 text-purple-700" /> ติดตามสถานะงานช่างฝีมือ
               </h3>
+              <button
+                onClick={() => navigate('/seller/orders')}
+                className="text-xs font-bold text-[#2A9D8F] hover:underline cursor-pointer"
+              >
+                ไปที่หน้า จัดการสเต็ปแบบละเอียด (Manage Orders) &rarr;
+              </button>
             </div>
             <div className="space-y-4">
               {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length === 0 ? (
@@ -435,19 +454,24 @@ function Dashboard() {
                 orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').map((craftOrd) => (
                   <div key={craftOrd.id} className="p-5 rounded-2xl border border-purple-200 bg-purple-50/30 space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="font-bold text-sm text-purple-950">ออเดอร์งานคราฟต์ #{craftOrd.id}</span>
-                      <span className="text-xs bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full font-bold">กำลังดำเนินการ</span>
+                      <div>
+                        <span className="font-bold text-sm text-purple-950 block">ออเดอร์งานคราฟต์ #{craftOrd.id}</span>
+                        <span className="text-xs text-stone-500">ผู้สั่งซื้อ: {craftOrd.buyer_name || 'ลูกค้า'}</span>
+                      </div>
+                      <span className="text-xs bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full font-bold">
+                        สถานะปัจจุบัน: {craftOrd.craft_status || craftOrd.status}
+                      </span>
                     </div>
                     <div className="pt-2 flex gap-2">
                       <button
-                        onClick={() => handleUpdateOrderStatus(craftOrd.id, 'in_progress')}
-                        className="px-3 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-amber-600 transition-all"
+                        onClick={() => handleUpdateOrderStatus(craftOrd.id, 'crafting', '03 // กำลังขึ้นรูปประดิษฐ์ (In Crafting)')}
+                        className="px-3 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-amber-600 transition-all cursor-pointer"
                       >
                         <Clock className="w-3.5 h-3.5" /> เริ่มประดิษฐ์ชิ้นงาน
                       </button>
                       <button
-                        onClick={() => handleUpdateOrderStatus(craftOrd.id, 'completed')}
-                        className="px-3 py-1.5 bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-emerald-700 transition-all"
+                        onClick={() => handleUpdateOrderStatus(craftOrd.id, 'completed', '07 // เสร็จสมบูรณ์ (Completed)')}
+                        className="px-3 py-1.5 bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-emerald-700 transition-all cursor-pointer"
                       >
                         <CheckCircle className="w-3.5 h-3.5" /> ประดิษฐ์เสร็จสิ้น
                       </button>
@@ -459,7 +483,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* TAB: รีวิวและความคิดเห็นจากลูกค้า (พร้อมปุ่มเปิด Thread สนทนา และจุดแจ้งเตือนสีแดง) */}
+        {/* TAB: รีวิวและความคิดเห็น */}
         {activeTab === 'reviews' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -497,14 +521,13 @@ function Dashboard() {
                           </div>
                           <p className="text-sm text-stone-600 mt-1">"{rev.comment || 'ไม่มีข้อความรีวิว'}"</p>
 
-                          {/* ปุ่มเปิดกล่องสนทนา (พร้อมจุดแจ้งเตือนสีแดงถ้ายังไม่ตอบกลับ) */}
                           <div className="mt-3">
                             <button
                               onClick={() => {
                                 setActiveReviewModal(rev);
                                 setReplyMessage('');
                               }}
-                              className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-stone-100 border border-stone-300 rounded-lg text-xs font-bold text-stone-700 shadow-2xs transition-all"
+                              className="relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-stone-100 border border-stone-300 rounded-lg text-xs font-bold text-stone-700 shadow-2xs transition-all cursor-pointer"
                             >
                               <MessageSquare className="w-3.5 h-3.5 text-emerald-800" />
                               <span>ดูการสนทนา / ตอบกลับ</span>
@@ -531,7 +554,7 @@ function Dashboard() {
 
       </div>
 
-      {/* --- MODAL สนทนาตอบกลับรีวิว (Thread Conversation Modal) --- */}
+      {/* --- MODAL สนทนาตอบกลับรีวิว --- */}
       {activeReviewModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
@@ -540,12 +563,10 @@ function Dashboard() {
                 <Sparkles className="w-5 h-5 text-emerald-800" />
                 <h3 className="text-lg font-bold text-stone-900">สนทนากับลูกค้า (รีวิวสินค้า)</h3>
               </div>
-              <button onClick={() => setActiveReviewModal(null)} className="text-stone-400 hover:text-stone-700 font-bold text-lg">✕</button>
+              <button onClick={() => setActiveReviewModal(null)} className="text-stone-400 hover:text-stone-700 font-bold text-lg cursor-pointer">✕</button>
             </div>
 
-            {/* ส่วนแสดงประวัติการสนทนา (Thread Messages) */}
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 max-h-[50vh]">
-              {/* ข้อความฝั่งลูกค้า */}
               <div className="flex gap-3 items-start bg-stone-50 p-3.5 rounded-xl border border-stone-200">
                 <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs flex-shrink-0">
                   {activeReviewModal.customer_name ? activeReviewModal.customer_name.charAt(0) : 'ล'}
@@ -566,7 +587,6 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* ข้อความฝั่งร้านค้า (ถ้ามีการตอบกลับแล้ว) */}
               {activeReviewModal.reply_text ? (
                 <div className="flex gap-3 items-start bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 flex-row-reverse">
                   <div className="w-8 h-8 rounded-full bg-emerald-800 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">
@@ -591,7 +611,6 @@ function Dashboard() {
               )}
             </div>
 
-            {/* ฟอร์มพิมพ์ข้อความตอบกลับใหม่ */}
             <form onSubmit={handleSendReviewReply} className="space-y-3 pt-3 border-t">
               <div>
                 <label className="block text-xs font-bold text-stone-700 mb-1">พิมพ์ข้อความตอบกลับลูกค้า</label>
@@ -609,14 +628,14 @@ function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setActiveReviewModal(null)}
-                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl"
+                  className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl cursor-pointer"
                 >
                   ปิดหน้าต่าง
                 </button>
                 <button
                   type="submit"
                   disabled={sendingReply || !replyMessage.trim()}
-                  className="px-5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   {sendingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                   <span>{sendingReply ? 'กำลังส่ง...' : 'ส่งคำตอบกลับ'}</span>
@@ -633,7 +652,7 @@ function Dashboard() {
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="text-lg font-bold text-stone-900">แก้ไขรายละเอียดงานคราฟต์</h3>
-              <button onClick={() => setSelectedProduct(null)} className="text-stone-400 hover:text-stone-700 font-bold text-lg">✕</button>
+              <button onClick={() => setSelectedProduct(null)} className="text-stone-400 hover:text-stone-700 font-bold text-lg cursor-pointer">✕</button>
             </div>
 
             {editError && (
@@ -720,7 +739,6 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* Checkboxes: Made-to-order & Supports customization */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-stone-50 rounded-xl border border-stone-200">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-stone-700">
                   <input
@@ -764,7 +782,7 @@ function Dashboard() {
                 <button
                   type="button"
                   onClick={() => handleDeleteProduct(selectedProduct.id)}
-                  className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition-all"
+                  className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
                 >
                   ลบสินค้านี้
                 </button>
@@ -778,14 +796,14 @@ function Dashboard() {
                       setEditError(null);
                       setEditSuccess(null);
                     }}
-                    className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl"
+                    className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl cursor-pointer"
                   >
                     ยกเลิก
                   </button>
                   <button
                     type="submit"
                     disabled={updatingProduct}
-                    className="px-5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                    className="px-5 py-2 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                   >
                     {updatingProduct && <Loader2 className="w-4 h-4 animate-spin" />}
                     <span>{updatingProduct ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข'}</span>

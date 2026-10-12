@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getSellerOrders, updateCraftStatus } from '../../services/orderService';
+import api from '../../services/api';
 import Badge from '../../components/common/Badge';
 import {
   Hammer,
@@ -38,12 +38,13 @@ export const ManageOrders = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await getSellerOrders();
+      const res = await api.get('/seller/orders');
       if (res && res.data) {
-        setOrders(res.data);
+        const orderList = Array.isArray(res.data) ? res.data : (res.data.data || []);
+        setOrders(orderList);
         const initialStatuses = {};
-        res.data.forEach(ord => {
-          initialStatuses[ord.id] = ord.craft_status;
+        orderList.forEach(ord => {
+          initialStatuses[ord.id] = ord.craft_status || ord.status;
         });
         setSelectedStatus(initialStatuses);
       }
@@ -90,17 +91,18 @@ export const ManageOrders = () => {
       const note = customNote[orderId] || '';
       const matched = STATUS_OPTIONS.find((s) => s.value === newStatus);
 
-      await updateCraftStatus(orderId, {
+      // เรียกใช้ API ฝั่ง Seller โดยตรง
+      await api.patch(`/seller/orders/${orderId}/craft-status`, {
         craft_status: newStatus,
         step_title: matched?.label || newStatus,
         note
       });
 
-      alert(`อัปเดตสถานะงานคราฟต์เรียบร้อยแล้ว!`);
+      alert(`✨ อัปเดตสถานะงานคราฟต์สำเร็จ! ส่งข้อมูลถึงผู้ซื้อเรียบร้อยแล้ว`);
       fetchOrders();
     } catch (err) {
-      alert(`อัปเดตสถานะสำเร็จ (ระบบสาธิต)`);
-      fetchOrders();
+      console.error('Update craft status error:', err);
+      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setUpdatingId(null);
     }
@@ -137,7 +139,7 @@ export const ManageOrders = () => {
 
   const filteredOrders = orders.filter(ord => {
     if (filterStatus === 'all') return true;
-    return ord.craft_status === filterStatus;
+    return (ord.craft_status || ord.status) === filterStatus;
   });
 
   return (
@@ -214,7 +216,7 @@ export const ManageOrders = () => {
                       ORDER #{ord.id}
                     </span>
                     <span className="text-[10px] font-mono tracking-wider uppercase px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold">
-                      ✓ {ord.payment_status === 'paid' ? 'PAID CONFIRMED' : ord.payment_status}
+                      ✓ {ord.payment_status === 'paid' ? 'PAID CONFIRMED' : (ord.payment_status || ord.status)}
                     </span>
                   </div>
                   <p className="text-xs text-stone-700 pt-1">
@@ -242,12 +244,12 @@ export const ManageOrders = () => {
                   <div key={idx} className="p-4 bg-stone-50 rounded-2xl text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border border-stone-200/60">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-display font-bold text-stone-900 text-sm sm:text-base">{it.product_title}</span>
+                        <span className="font-display font-bold text-stone-900 text-sm sm:text-base">{it.product_title || it.title}</span>
                         <span className="bg-[#1B4332] text-[#FFE6A7] text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
                           × {it.quantity}
                         </span>
                       </div>
-                      {renderCustomizationDetails(it.customization_details)}
+                      {renderCustomizationDetails(it.customization_details || it.customization_notes)}
                     </div>
                     <span className="font-mono font-extrabold text-stone-900 text-base shrink-0">
                       ฿{Number(it.price).toLocaleString()}
@@ -264,7 +266,7 @@ export const ManageOrders = () => {
                     <span>CRAFTING JOURNEY STAGE CONTROL</span>
                   </span>
                   <span className="text-xs text-stone-200 font-mono">
-                    CURRENT STAGE: <strong className="text-[#FFE6A7] uppercase font-bold">{ord.craft_status}</strong>
+                    CURRENT STAGE: <strong className="text-[#FFE6A7] uppercase font-bold">{ord.craft_status || ord.status}</strong>
                   </span>
                 </div>
 
@@ -274,7 +276,7 @@ export const ManageOrders = () => {
                       SELECT NEXT STAGE // เลือกขั้นตอน
                     </label>
                     <select
-                      value={selectedStatus[ord.id] || ord.craft_status}
+                      value={selectedStatus[ord.id] || ord.craft_status || ord.status}
                       disabled={updatingId === ord.id}
                       onChange={(e) => setSelectedStatus({ ...selectedStatus, [ord.id]: e.target.value })}
                       className="w-full text-xs font-medium p-3 bg-white text-stone-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE6A7] shadow-inner"
@@ -307,7 +309,7 @@ export const ManageOrders = () => {
                       type="button"
                       disabled={updatingId === ord.id}
                       onClick={() => handleUpdateStatus(ord.id)}
-                      className="btn-runway-terracotta w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      className="btn-runway-terracotta w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>{updatingId === ord.id ? 'SAVING...' : 'UPDATE'}</span>
