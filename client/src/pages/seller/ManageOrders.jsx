@@ -68,7 +68,7 @@ export const ManageOrders = () => {
     fetchOrders();
   }, []);
 
-  // ฟังก์ชันอัปเดตสเต็ปงานคราฟต์ & แนบรูปภาพความคืบหน้า (แก้ไข Payload ให้ปลอดภัย ไม่ติด Error 500)
+  // ฟังก์ชันอัปเดตสเต็ปงานคราฟต์ & แนบรูปภาพความคืบหน้า (ส่ง step_title และ image ไปหลังบ้านอย่างถูกต้อง)
   const handleUpdateStatus = async (orderId) => {
     const newStatus = selectedStatus[orderId];
     if (!newStatus) return;
@@ -77,25 +77,21 @@ export const ManageOrders = () => {
     try {
       const note = customNote[orderId] || '';
       const matched = STATUS_OPTIONS.find((s) => s.value === newStatus);
+      const stepTitleToSend = matched?.label || newStatus; // 👈 ส่งป้ายกำกับข้อความให้ตรงกับ column หลังบ้าน
       const imageFile = updateImageFile[orderId];
 
-      if (imageFile) {
-        const formData = new FormData();
-        formData.append('craft_status', newStatus);
-        formData.append('step_title', matched?.label || newStatus);
-        formData.append('note', note);
-        formData.append('image', imageFile);
+      const formData = new FormData();
+      formData.append('craft_status', newStatus);
+      formData.append('step_title', stepTitleToSend);
+      formData.append('note', note);
 
-        await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } else {
-        await api.patch(`/seller/orders/${orderId}/craft-status`, {
-          craft_status: newStatus,
-          step_title: matched?.label || newStatus,
-          note: note
-        });
+      if (imageFile) {
+        formData.append('image', imageFile); // 👈 แนบไฟล์รูปภาพ (ถ้ามี)
       }
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
 
       alert('✨ อัปเดตสถานะงานคราฟต์สำเร็จ! ส่งข้อมูลและรูปภาพถึงผู้ซื้อเรียบร้อยแล้ว');
       setUpdateImageFile({ ...updateImageFile, [orderId]: null });
@@ -115,11 +111,15 @@ export const ManageOrders = () => {
 
     setUpdatingId(orderId);
     try {
-      await api.patch(`/seller/orders/${orderId}/craft-status`, {
-        craft_status: 'order_placed',
-        step_title: '01 // รับคำสั่งซื้อ/รอชำระเงิน (Order Placed)',
-        note: 'ร้านค้าอนุมัติคำสั่งซื้อเรียบร้อยแล้ว กรุณาโอนเงินและแนบสลิปชำระเงิน'
+      const formData = new FormData();
+      formData.append('craft_status', 'order_placed');
+      formData.append('step_title', '01 // รับคำสั่งซื้อ/รอชำระเงิน (Order Placed)');
+      formData.append('note', 'ร้านค้าอนุมัติคำสั่งซื้อเรียบร้อยแล้ว กรุณาโอนเงินและแนบสลิปชำระเงิน');
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
+
       alert('✨ อนุมัติคำสั่งซื้อสำเร็จ! ปลดล็อกช่องแนบสลิปให้ฝั่งผู้ซื้อแล้วจ้า');
       fetchOrders();
     } catch (err) {
@@ -136,11 +136,15 @@ export const ManageOrders = () => {
 
     setUpdatingId(orderId);
     try {
-      await api.patch(`/seller/orders/${orderId}/craft-status`, {
-        craft_status: 'material_prep',
-        step_title: '02 // จัดเตรียมวัตถุดิบ (Material Prep)',
-        note: 'ร้านค้าตรวจสอบสลิปโอนเงินถูกต้องเรียบร้อยแล้ว เริ่มจัดเตรียมวัตถุดิบ'
+      const formData = new FormData();
+      formData.append('craft_status', 'material_prep');
+      formData.append('step_title', '02 // จัดเตรียมวัตถุดิบ (Material Prep)');
+      formData.append('note', 'ร้านค้าตรวจสอบสลิปโอนเงินถูกต้องเรียบร้อยแล้ว เริ่มจัดเตรียมวัตถุดิบ');
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
+
       alert('✨ ยืนยันสลิปถูกต้องและอนุมัติยอดเงินเรียบร้อยแล้ว!');
       fetchOrders();
     } catch (err) {
@@ -158,11 +162,15 @@ export const ManageOrders = () => {
 
     setUpdatingId(orderId);
     try {
-      await api.patch(`/seller/orders/${orderId}/craft-status`, {
-        craft_status: 'order_placed',
-        step_title: '01 // สลิปไม่ถูกต้อง (Invalid Slip)',
-        note: `❌ สลิปไม่ถูกต้อง: ${reason} กรุณาตรวจสอบและแนบสลิปใหม่อีกครั้ง`
+      const formData = new FormData();
+      formData.append('craft_status', 'order_placed');
+      formData.append('step_title', '01 // สลิปไม่ถูกต้อง (Invalid Slip)');
+      formData.append('note', `❌ สลิปไม่ถูกต้อง: ${reason} กรุณาตรวจสอบและแนบสลิปใหม่อีกครั้ง`);
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
+
       alert('✨ ส่งแจ้งเตือนสลิปไม่ถูกต้องไปยังผู้ซื้อเรียบร้อยแล้ว');
       fetchOrders();
     } catch (err) {
