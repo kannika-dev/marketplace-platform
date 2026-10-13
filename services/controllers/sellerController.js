@@ -790,7 +790,6 @@ export const updateCraftStatus = async (req, res) => {
     const step_title = req.body.step_title || req.body.craft_status || 'อัปเดตความคืบหน้า';
     const note = req.body.note || '';
 
-    // จัดการรูปภาพ (ถ้ามีอัปโหลดผ่าน multer หรือส่งลิงก์มา)
     let imageUrl = null;
     if (req.file) {
       imageUrl = getSecureCloudinaryUrl(req.file);
@@ -798,17 +797,14 @@ export const updateCraftStatus = async (req, res) => {
       imageUrl = req.body.image_url;
     }
 
-    // 1. อัปเดตเฉพาะ craft_status ในตาราง orders
     await pool.query(
       'UPDATE orders SET craft_status = ? WHERE id = ?',
       [craft_status, orderId]
     );
 
-    // 2. ป้องกันค่า step ยาวเกินไป
     const safeStep = String(craft_status || 'processing').substring(0, 50);
     const finalTitle = String(step_title || craft_status).substring(0, 255);
 
-    // 3. บันทึกประวัติสเต็ปงานคราฟต์ลงตาราง craft_tracking_logs (รวม image_url และกัน status_title เป็น NULL)
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
        VALUES (?, ?, ?, ?, ?, NOW())`,

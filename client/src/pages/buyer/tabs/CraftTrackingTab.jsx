@@ -78,12 +78,11 @@ export const CraftTrackingTab = () => {
                         const displayStageText = STAGE_LABELS[rawStage] || rawStage;
 
                         // ดึงโน้ตล่าสุดจากไทม์ไลน์ เพื่อนำมาแสดงข้อความเหตุผลจากผู้ขาย
-                        const latestTimelineNote = order.timeline && order.timeline.length > 0 ? order.timeline[0]?.notes : null;
+                        const latestTimelineNote = order.timeline && order.timeline.length > 0 ? order.timeline[order.timeline.length - 1]?.notes : null;
 
                         // เช็กสถานะการอนุมัติและการปฏิเสธสลิป
                         const isSlipRejected = order.payment_status === 'rejected' || (latestTimelineNote && latestTimelineNote.includes('สลิปไม่ถูกต้อง'));
 
-                        // แก้ไขจุดเช็กการรออนุมัติ: ถ้า craft_status เป็น order_placed หรือเกินกว่านั้นแล้ว ถือว่าร้าน "อนุมัติแล้ว" ปลดล็อกทันที!
                         const isPendingApproval =
                             (order.status === 'pending_approval' || order.craft_status === 'pending_approval' || order.status === 'pending_verification') &&
                             order.craft_status !== 'order_placed' &&
@@ -162,7 +161,7 @@ export const CraftTrackingTab = () => {
                                         <p className="text-stone-500 whitespace-pre-line">{order.shipping_address}</p>
                                     </div>
 
-                                    {/* 🎯 Payment Zone: แสดงตามสถานะจริงโดยไม่งง */}
+                                    {/* 🎯 Payment Zone */}
                                     <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-xs space-y-3 flex flex-col justify-between">
                                         <div className="space-y-1.5">
                                             <span className="font-bold text-stone-800 block">สถานะการชำระเงิน & หลักฐาน:</span>
@@ -172,7 +171,6 @@ export const CraftTrackingTab = () => {
                                             </div>
                                         </div>
 
-                                        {/* CASE 1: สลิปถูกต้องแล้ว */}
                                         {isPaymentVerified ? (
                                             <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between gap-3">
                                                 <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
@@ -185,7 +183,6 @@ export const CraftTrackingTab = () => {
                                                 )}
                                             </div>
                                         ) : isSlipRejected ? (
-                                            /* CASE 2: กรณีสลิปไม่ถูกต้อง (โชว์เตือนแดง + ปุ่มกดเลือกสลิปใหม่ทันที!) */
                                             <div className="p-3 bg-rose-50 rounded-2xl border border-rose-200 space-y-2">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[11px] font-bold text-rose-700 flex items-center gap-1">
@@ -204,7 +201,6 @@ export const CraftTrackingTab = () => {
                                                 </label>
                                             </div>
                                         ) : hasUploadedSlip ? (
-                                            /* CASE 3: แนบสลิปแล้ว อยู่ระหว่างรอตรวจ */
                                             <div className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between gap-3">
                                                 <div className="flex items-center gap-2.5 overflow-hidden">
                                                     <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-stone-200 shrink-0 bg-stone-100">
@@ -225,12 +221,10 @@ export const CraftTrackingTab = () => {
                                                 </div>
                                             </div>
                                         ) : isPendingApproval ? (
-                                            /* CASE 4: ยังไม่ได้รับการอนุมัติคำสั่งซื้อ */
                                             <button disabled className="w-full py-2.5 px-4 bg-stone-200 text-stone-400 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed">
                                                 <Lock className="w-3.5 h-3.5" /> <span>แนบสลิปชำระเงิน (รอร้านอนุมัติ)</span>
                                             </button>
                                         ) : (
-                                            /* CASE 5: ร้านอนุมัติแล้ว รอแนบสลิปครั้งแรก */
                                             <label className="w-full py-2.5 px-4 btn-3d-peach text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
                                                 <Upload className="w-4 h-4" />
                                                 <span>แนบสลิปชำระเงิน ({isDeposit ? 'มัดจำ 50%' : 'ยอดเต็ม'})</span>
@@ -252,15 +246,15 @@ export const CraftTrackingTab = () => {
                                                     <div className="flex items-start gap-3">
                                                         <div className="w-2.5 h-2.5 rounded-full bg-[#2A9D8F] mt-1.5 shrink-0" />
                                                         <div className="space-y-0.5 flex-1">
-                                                            <span className="font-bold text-stone-900 block">{STAGE_LABELS[log.status_title] || log.status_title}</span>
+                                                            <span className="font-bold text-stone-900 block">{STAGE_LABELS[log.status_title || log.step] || log.status_title || log.step}</span>
                                                             <p className="text-stone-600 leading-relaxed">{log.notes}</p>
                                                             <span className="text-[10px] text-stone-400 font-mono block pt-0.5">{new Date(log.created_at).toLocaleString('th-TH')}</span>
                                                         </div>
                                                     </div>
                                                     {log.image_url && (
                                                         <div className="pl-5 pt-1">
-                                                            <div onClick={() => setPreviewImage(log.image_url)} className="relative w-28 h-28 rounded-xl overflow-hidden border border-stone-200 cursor-pointer group">
-                                                                <img src={log.image_url} alt="ความคืบหน้า" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                            <div onClick={() => setPreviewImage(log.image_url)} className="relative w-28 h-28 rounded-xl overflow-hidden border border-stone-200 cursor-pointer group shadow-sm bg-white">
+                                                                <img src={log.image_url} alt="ความคืบหน้างานคราฟต์" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                                             </div>
                                                         </div>
                                                     )}
