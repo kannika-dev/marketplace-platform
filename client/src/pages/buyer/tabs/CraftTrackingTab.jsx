@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { PackageCheck, Clock, MapPin, Sparkles, MessageSquare, Edit3, Upload, CheckCircle2, Truck } from 'lucide-react';
+import { PackageCheck, Clock, MapPin, Sparkles, MessageSquare, Upload, CheckCircle2, Eye, X, Image as ImageIcon, Lock, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react';
 import { getMyOrders, uploadPaymentSlip } from '../../../services/orderService';
 
-// อัปเดตสเต็ปแรกให้ครอบคลุมคำว่า "รับคำสั่งซื้อ/รอชำระเงิน" ตามที่เตงต้องการ
 const STAGE_LABELS = {
+    'pending_approval': '00 // รอร้านค้าอนุมัติคิวงาน (Pending Approval)',
     'order_placed': '01 // รับคำสั่งซื้อ/รอชำระเงิน (Order Placed)',
     'material_prep': '02 // จัดเตรียมวัตถุดิบ (Material Prep)',
     'crafting': '03 // กำลังขึ้นรูปประดิษฐ์ (In Crafting)',
@@ -16,6 +16,7 @@ const STAGE_LABELS = {
 export const CraftTrackingTab = () => {
     const [trackingOrders, setTrackingOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [previewImage, setPreviewImage] = useState(null);
 
     const fetchTrackingData = async () => {
         try {
@@ -42,7 +43,7 @@ export const CraftTrackingTab = () => {
         try {
             const res = await uploadPaymentSlip(orderId, file);
             if (res.success) {
-                alert('✨ อัปโหลดสลิปเรียบร้อย! ระบบกำลังส่งข้อมูลให้ช่างฝีมือตรวจสอบ');
+                alert('✨ อัปโหลดสลิปใหม่เรียบร้อยแล้ว! ระบบส่งหลักฐานให้ช่างฝีมือตรวจสอบ');
                 fetchTrackingData();
             }
         } catch (err) {
@@ -64,21 +65,40 @@ export const CraftTrackingTab = () => {
             </div>
 
             {loading ? (
-                <div className="text-center py-16 text-stone-400 text-xs">กำลังโหลดข้อมูลติดตามสินค้า...</div>
+                <div className="text-center py-16 text-stone-400 text-xs">กำลังโหลดข้อมูล...</div>
             ) : trackingOrders.length === 0 ? (
                 <div className="p-6 rounded-2xl bg-stone-50 border border-stone-200 text-center space-y-3">
                     <PackageCheck className="w-12 h-12 text-[#2A9D8F] mx-auto animate-bounce" />
                     <h4 className="text-sm font-bold text-stone-800">ยังไม่มีคำสั่งซื้อที่อยู่ระหว่างการผลิต</h4>
-                    <p className="text-xs text-stone-500 max-w-md mx-auto">
-                        เมื่อคุณสั่งซื้อสินค้างานคราฟต์ประเภท Made-to-Order สถานะการคัดสรรวัตถุดิบและขึ้นรูปชิ้นงานจากช่างฝีมือจะแสดงขึ้นที่นี่
-                    </p>
                 </div>
             ) : (
                 <div className="space-y-6">
                     {trackingOrders.map((order) => {
-                        const rawStage = order.craft_status || order.status || 'order_placed';
+                        const rawStage = order.craft_status || order.status || 'pending_approval';
                         const displayStageText = STAGE_LABELS[rawStage] || rawStage;
-                        const isApproved = order.status !== 'unpaid' || (order.craft_status && order.craft_status !== 'unpaid');
+
+                        // ดึงโน้ตล่าสุดจากไทม์ไลน์ เพื่อนำมาแสดงข้อความเหตุผลจากผู้ขาย
+                        const latestTimelineNote = order.timeline && order.timeline.length > 0 ? order.timeline[0]?.notes : null;
+
+                        // เช็กสถานะการอนุมัติและการปฏิเสธสลิป
+                        const isSlipRejected = order.payment_status === 'rejected' || (latestTimelineNote && latestTimelineNote.includes('สลิปไม่ถูกต้อง'));
+
+                        // แก้ไขจุดเช็กการรออนุมัติ: ถ้า craft_status เป็น order_placed หรือเกินกว่านั้นแล้ว ถือว่าร้าน "อนุมัติแล้ว" ปลดล็อกทันที!
+                        const isPendingApproval =
+                            (order.status === 'pending_approval' || order.craft_status === 'pending_approval' || order.status === 'pending_verification') &&
+                            order.craft_status !== 'order_placed' &&
+                            order.status !== 'order_placed' &&
+                            !order.payment_slip_url &&
+                            !isSlipRejected;
+
+                        const isPaymentVerified = !isSlipRejected && (
+                            order.payment_status === 'paid' ||
+                            order.status === 'paid' ||
+                            order.status === 'completed' ||
+                            (order.craft_status && order.craft_status !== 'order_placed' && order.craft_status !== 'pending_approval' && order.craft_status !== 'pending_verification')
+                        );
+
+                        const hasUploadedSlip = Boolean(order.payment_slip_url);
                         const isDeposit = order.payment_type === 'deposit';
 
                         return (
@@ -91,13 +111,25 @@ export const CraftTrackingTab = () => {
                                     </div>
 
                                     <div className="flex items-center gap-2">
-                                        {isApproved ? (
-                                            <span className="px-3.5 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold rounded-full flex items-center gap-1.5 shadow-sm">
-                                                🟢 ติดตามสถานะคำสั่งซื้อ: <span className="underline">{displayStageText}</span>
+                                        {isPendingApproval ? (
+                                            <span className="px-3.5 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold rounded-full flex items-center gap-1.5">
+                                                🟡 รอร้านค้าอนุมัติคำสั่งซื้อ
+                                            </span>
+                                        ) : isSlipRejected ? (
+                                            <span className="px-3.5 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold rounded-full flex items-center gap-1.5">
+                                                🔴 สลิปไม่ถูกต้อง - กรุณาแนบสลิปใหม่
+                                            </span>
+                                        ) : isPaymentVerified ? (
+                                            <span className="px-3.5 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold rounded-full flex items-center gap-1.5">
+                                                🟢 กำลังรังสรรค์งานคราฟต์: <span className="underline">{displayStageText}</span>
+                                            </span>
+                                        ) : hasUploadedSlip ? (
+                                            <span className="px-3.5 py-1.5 bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold rounded-full flex items-center gap-1.5">
+                                                ⏳ แนบสลิปแล้ว (รอร้านค้าตรวจสอบ)
                                             </span>
                                         ) : (
-                                            <span className="px-3.5 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold rounded-full flex items-center gap-1.5 shadow-sm">
-                                                🔴 ยังไม่ได้รับการอนุมัติ (ติดต่อร้านค้า)
+                                            <span className="px-3.5 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold rounded-full flex items-center gap-1.5">
+                                                🟢 อนุมัติแล้ว / รอชำระเงิน
                                             </span>
                                         )}
                                         <span className="px-3 py-1 bg-[#E8F7F3] text-[#2A9D8F] border border-[#A2D9D2] text-[11px] font-bold rounded-full">
@@ -106,50 +138,104 @@ export const CraftTrackingTab = () => {
                                     </div>
                                 </div>
 
-                                {/* Reply */}
-                                <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-xs space-y-1">
-                                    <span className="font-bold text-[#1B4332] flex items-center gap-1.5">
+                                {/* 💬 Reply Message Zone: ดึงข้อความเหตุผลจากคนขายมาแสดงโดยตรง */}
+                                <div className={`p-4 rounded-2xl border text-xs space-y-1 ${isSlipRejected ? 'bg-rose-50/70 border-rose-200' : 'bg-emerald-50/60 border-emerald-100'}`}>
+                                    <span className={`font-bold flex items-center gap-1.5 ${isSlipRejected ? 'text-rose-800' : 'text-[#1B4332]'}`}>
                                         <MessageSquare className="w-3.5 h-3.5 text-[#2A9D8F]" /> การตอบกลับจากร้านค้า / ช่างฝีมือ:
                                     </span>
-                                    <p className="text-stone-600 pl-5">
-                                        {order.seller_reply || (isApproved ? 'ร้านค้ารับทราบคำสั่งซื้อและเริ่มจัดเตรียมคิวงานเรียบร้อยครับ' : 'อยู่ระหว่างรอผู้ขายตรวจสอบคิวงาน Made-to-Order สักครู่นะคะ')}
+                                    <p className={`pl-5 font-medium ${isSlipRejected ? 'text-rose-700 font-bold' : 'text-stone-600'}`}>
+                                        {latestTimelineNote || order.seller_reply || (
+                                            isPaymentVerified
+                                                ? 'ร้านค้าตรวจสอบสลิปถูกต้อง เริ่มดำเนินการตามขั้นตอนงานคราฟต์ครับ'
+                                                : isPendingApproval
+                                                    ? 'อยู่ระหว่างรอผู้ขายตรวจสอบคิวงาน Made-to-Order'
+                                                    : 'ร้านค้าอนุมัติคำสั่งซื้อแล้ว สามารถโอนเงินและแนบสลิปได้เลยค่ะ'
+                                        )}
                                     </p>
                                 </div>
 
-                                {/* Address & Payment */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-xs space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-bold text-stone-800 flex items-center gap-1">
-                                                <MapPin className="w-3.5 h-3.5 text-[#2A9D8F]" /> ที่อยู่จัดส่งและข้อมูลลูกค้า:
-                                            </span>
-                                        </div>
-                                        <p className="text-stone-500 whitespace-pre-line leading-relaxed">{order.shipping_address}</p>
+                                        <span className="font-bold text-stone-800 flex items-center gap-1">
+                                            <MapPin className="w-3.5 h-3.5 text-[#2A9D8F]" /> ที่อยู่จัดส่ง:
+                                        </span>
+                                        <p className="text-stone-500 whitespace-pre-line">{order.shipping_address}</p>
                                     </div>
 
-                                    <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-xs space-y-2 flex flex-col justify-between">
-                                        <div>
-                                            <span className="font-bold text-stone-800 block mb-1">สถานะการชำระเงิน:</span>
+                                    {/* 🎯 Payment Zone: แสดงตามสถานะจริงโดยไม่งง */}
+                                    <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-xs space-y-3 flex flex-col justify-between">
+                                        <div className="space-y-1.5">
+                                            <span className="font-bold text-stone-800 block">สถานะการชำระเงิน & หลักฐาน:</span>
                                             <div className="flex justify-between text-stone-600">
                                                 <span>ยอดรวมทั้งหมด:</span>
-                                                <span className="font-bold">฿{Number(order.total_amount).toLocaleString()}</span>
+                                                <span className="font-bold text-stone-900">฿{Number(order.total_amount).toLocaleString()}</span>
                                             </div>
-                                            {isDeposit && (
-                                                <div className="flex justify-between text-[#2A9D8F] font-bold">
-                                                    <span>ยอดมัดจำ (50%):</span>
-                                                    <span>฿{Number(order.deposit_amount).toLocaleString()}</span>
-                                                </div>
-                                            )}
                                         </div>
 
-                                        {order.status === 'unpaid' && (
-                                            <div className="pt-2">
-                                                <label className="w-full py-2 px-4 btn-3d-peach text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-                                                    <Upload className="w-3.5 h-3.5" />
-                                                    <span>แนบสลิปชำระเงิน ({isDeposit ? 'มัดจำ 50%' : 'ยอดเต็ม'})</span>
+                                        {/* CASE 1: สลิปถูกต้องแล้ว */}
+                                        {isPaymentVerified ? (
+                                            <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between gap-3">
+                                                <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                                                    <CheckCircle className="w-4 h-4 text-emerald-600" /> สลิปถูกต้อง ตรวจสอบเรียบร้อยแล้ว
+                                                </span>
+                                                {order.payment_slip_url && (
+                                                    <button type="button" onClick={() => setPreviewImage(order.payment_slip_url)} className="p-1.5 bg-white text-stone-600 hover:text-[#2A9D8F] rounded-lg cursor-pointer border border-stone-200">
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : isSlipRejected ? (
+                                            /* CASE 2: กรณีสลิปไม่ถูกต้อง (โชว์เตือนแดง + ปุ่มกดเลือกสลิปใหม่ทันที!) */
+                                            <div className="p-3 bg-rose-50 rounded-2xl border border-rose-200 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[11px] font-bold text-rose-700 flex items-center gap-1">
+                                                        <AlertTriangle className="w-4 h-4 text-rose-600" /> สลิปเดิมไม่ถูกต้อง
+                                                    </span>
+                                                    {order.payment_slip_url && (
+                                                        <button type="button" onClick={() => setPreviewImage(order.payment_slip_url)} className="text-[10px] text-stone-500 underline hover:text-stone-800">
+                                                            ดูสลิปเดิม
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <label className="w-full py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-colors">
+                                                    <RefreshCw className="w-3.5 h-3.5" />
+                                                    <span>คลิกเพื่ออัปโหลดสลิปใบใหม่</span>
                                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
                                                 </label>
                                             </div>
+                                        ) : hasUploadedSlip ? (
+                                            /* CASE 3: แนบสลิปแล้ว อยู่ระหว่างรอตรวจ */
+                                            <div className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-2.5 overflow-hidden">
+                                                    <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-stone-200 shrink-0 bg-stone-100">
+                                                        <img src={order.payment_slip_url} alt="สลิป" className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <span className="text-[11px] font-bold text-amber-700 block">🟡 แนบสลิปแล้ว (รอตรวจ)</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button type="button" onClick={() => setPreviewImage(order.payment_slip_url)} className="p-1.5 bg-stone-100 text-stone-600 hover:text-[#2A9D8F] rounded-lg cursor-pointer" title="ดูสลิป">
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    <label className="p-1.5 bg-stone-100 hover:bg-amber-50 text-stone-600 hover:text-amber-700 rounded-lg cursor-pointer transition-colors" title="เปลี่ยนรูปสลิป">
+                                                        <Upload className="w-4 h-4" />
+                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        ) : isPendingApproval ? (
+                                            /* CASE 4: ยังไม่ได้รับการอนุมัติคำสั่งซื้อ */
+                                            <button disabled className="w-full py-2.5 px-4 bg-stone-200 text-stone-400 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed">
+                                                <Lock className="w-3.5 h-3.5" /> <span>แนบสลิปชำระเงิน (รอร้านอนุมัติ)</span>
+                                            </button>
+                                        ) : (
+                                            /* CASE 5: ร้านอนุมัติแล้ว รอแนบสลิปครั้งแรก */
+                                            <label className="w-full py-2.5 px-4 btn-3d-peach text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+                                                <Upload className="w-4 h-4" />
+                                                <span>แนบสลิปชำระเงิน ({isDeposit ? 'มัดจำ 50%' : 'ยอดเต็ม'})</span>
+                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
+                                            </label>
                                         )}
                                     </div>
                                 </div>
@@ -159,42 +245,50 @@ export const CraftTrackingTab = () => {
                                     <h4 className="text-xs font-extrabold text-stone-800 flex items-center gap-1.5">
                                         <Clock className="w-4 h-4 text-[#2A9D8F]" /> ไทม์ไลน์ความคืบหน้างานแฮนด์เมด (Craft Progress)
                                     </h4>
-
-                                    <div className="space-y-2">
+                                    <div className="space-y-2.5">
                                         {order.timeline && order.timeline.length > 0 ? (
-                                            order.timeline.map((log, index) => {
-                                                const formattedStatusTitle = STAGE_LABELS[log.status_title] || STAGE_LABELS[log.step] || log.status_title;
-
-                                                return (
-                                                    <div key={index} className="p-3 bg-stone-50 rounded-xl border border-stone-100 flex items-start gap-3 text-xs">
-                                                        <div className="w-2.5 h-2.5 rounded-full bg-[#2A9D8F] mt-1.5 shrink-0 shadow-sm" />
-                                                        <div className="space-y-0.5">
-                                                            <span className="font-bold text-stone-900 block">{formattedStatusTitle}</span>
-                                                            <p className="text-stone-600 font-normal">{log.notes}</p>
-                                                            <span className="text-[10px] text-stone-400 font-mono">{new Date(log.created_at).toLocaleString('th-TH')}</span>
+                                            order.timeline.map((log, index) => (
+                                                <div key={index} className="p-3.5 bg-stone-50 rounded-2xl border border-stone-100 space-y-2 text-xs">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-[#2A9D8F] mt-1.5 shrink-0" />
+                                                        <div className="space-y-0.5 flex-1">
+                                                            <span className="font-bold text-stone-900 block">{STAGE_LABELS[log.status_title] || log.status_title}</span>
+                                                            <p className="text-stone-600 leading-relaxed">{log.notes}</p>
+                                                            <span className="text-[10px] text-stone-400 font-mono block pt-0.5">{new Date(log.created_at).toLocaleString('th-TH')}</span>
                                                         </div>
                                                     </div>
-                                                );
-                                            })
+                                                    {log.image_url && (
+                                                        <div className="pl-5 pt-1">
+                                                            <div onClick={() => setPreviewImage(log.image_url)} className="relative w-28 h-28 rounded-xl overflow-hidden border border-stone-200 cursor-pointer group">
+                                                                <img src={log.image_url} alt="ความคืบหน้า" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))
                                         ) : (
                                             <p className="text-xs text-stone-400 italic">ยังไม่มีอัปเดตไทม์ไลน์จากช่างฝีมือ</p>
                                         )}
                                     </div>
                                 </div>
-
-                                {/* Action */}
-                                <div className="pt-4 border-t border-stone-100 flex items-center justify-between">
-                                    <span className="text-[11px] text-stone-400">เมื่อได้รับสินค้าและตรวจสอบความเรียบร้อยแล้ว สามารถกดปุ่มยืนยันได้เลยค่ะ</span>
-                                    <button
-                                        onClick={() => alert('✨ ยืนยันการรับสินค้าสำเร็จ!')}
-                                        className="btn-3d-peach px-6 py-2.5 rounded-xl text-xs font-bold shadow-md flex items-center gap-1.5 cursor-pointer"
-                                    >
-                                        <CheckCircle2 className="w-4 h-4" /> ยืนยันได้รับสินค้าเรียบร้อย
-                                    </button>
-                                </div>
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* Modal Lightbox */}
+            {previewImage && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+                    <div className="relative max-w-lg w-full bg-white rounded-3xl p-4 shadow-2xl space-y-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                            <span className="text-xs font-bold text-stone-800 flex items-center gap-1"><ImageIcon className="w-4 h-4 text-[#2A9D8F]" /> ตัวอย่างรูปภาพ / หลักฐาน</span>
+                            <button onClick={() => setPreviewImage(null)} className="p-1 hover:bg-stone-100 rounded-full"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="rounded-2xl overflow-hidden max-h-[70vh] flex items-center justify-center bg-stone-900">
+                            <img src={previewImage} alt="ขยายใหญ่" className="max-h-[68vh] w-auto object-contain" />
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

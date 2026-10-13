@@ -794,11 +794,14 @@ export const updateCraftStatus = async (req, res) => {
       [craft_status, orderId]
     );
 
-    // 2. บันทึกประวัติสเต็ปงานคราฟต์ลงตาราง craft_tracking_logs สำหรับแสดงไทม์ไลน์
+    // 2. ป้องกันค่า step ยาวเกินไป ป้องกัน Error 500
+    const safeStep = String(craft_status || 'processing').substring(0, 50);
+
+    // 3. บันทึกประวัติสเต็ปงานคราฟต์ลงตาราง craft_tracking_logs สำหรับแสดงไทม์ไลน์
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, created_at)
        VALUES (?, ?, ?, ?, NOW())`,
-      [orderId, craft_status, step_title || craft_status, note || '']
+      [orderId, safeStep, step_title || craft_status, note || '']
     );
 
     return res.json({
