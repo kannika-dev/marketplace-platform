@@ -65,7 +65,9 @@ export const CraftTrackingTab = () => {
             ) : (
                 <div className="space-y-6">
                     {trackingOrders.map((order) => {
-                        const isApproved = order.status !== 'unpaid' && order.status !== 'pending_verification';
+                        // ปรับให้เช็กจาก craft_status หรือสถานะปัจจุบันร่วมด้วย เพื่อให้ป้ายเปลี่ยนเป็นสีเขียวทันทีที่มีการอัปเดตสเต็ปงาน
+                        const currentStage = order.craft_status || order.status;
+                        const isApproved = order.status !== 'unpaid' || (order.craft_status && order.craft_status !== 'unpaid');
                         const isDeposit = order.payment_type === 'deposit';
 
                         return (
@@ -80,7 +82,7 @@ export const CraftTrackingTab = () => {
                                     <div className="flex items-center gap-2">
                                         {isApproved ? (
                                             <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold rounded-full flex items-center gap-1">
-                                                🟢 ได้รับการอนุมัติแล้ว
+                                                🟢 กำลังรังสรรค์งานคราฟต์ ({currentStage})
                                             </span>
                                         ) : (
                                             <span className="px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold rounded-full flex items-center gap-1">

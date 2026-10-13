@@ -211,12 +211,12 @@ export const ManageOrders = () => {
               {/* Order Editorial Card Top Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-stone-200 gap-4">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <span className="font-mono text-sm font-extrabold text-[#1B4332] bg-[#FFE6A7]/40 px-3 py-1 rounded-full border border-[#FFE6A7]">
                       ORDER #{ord.id}
                     </span>
-                    <span className="text-[10px] font-mono tracking-wider uppercase px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold">
-                      ✓ {ord.payment_status === 'paid' ? 'PAID CONFIRMED' : (ord.payment_status || ord.status)}
+                    <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold border border-emerald-200">
+                      🛠️ STAGE: {ord.craft_status || ord.status}
                     </span>
                   </div>
                   <p className="text-xs text-stone-700 pt-1">
