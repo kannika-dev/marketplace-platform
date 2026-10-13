@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { PackageCheck, Clock, MapPin, Sparkles, MessageSquare, Edit3, Upload, CheckCircle2, Truck } from 'lucide-react';
 import { getMyOrders, uploadPaymentSlip } from '../../../services/orderService';
 
+// อัปเดตสเต็ปแรกให้ครอบคลุมคำว่า "รับคำสั่งซื้อ/รอชำระเงิน" ตามที่เตงต้องการ
+const STAGE_LABELS = {
+    'order_placed': '01 // รับคำสั่งซื้อ/รอชำระเงิน (Order Placed)',
+    'material_prep': '02 // จัดเตรียมวัตถุดิบ (Material Prep)',
+    'crafting': '03 // กำลังขึ้นรูปประดิษฐ์ (In Crafting)',
+    'customizing': '04 // แต่งแต้มพิเศษ/สลักชื่อ (Customizing)',
+    'quality_check': '05 // ตรวจสอบความประณีต (Quality Check)',
+    'shipped': '06 // จัดส่งพัสดุแล้ว (Shipped)',
+    'completed': '07 // เสร็จสมบูรณ์ (Completed)'
+};
+
 export const CraftTrackingTab = () => {
     const [trackingOrders, setTrackingOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -65,8 +76,8 @@ export const CraftTrackingTab = () => {
             ) : (
                 <div className="space-y-6">
                     {trackingOrders.map((order) => {
-                        // ปรับให้เช็กจาก craft_status หรือสถานะปัจจุบันร่วมด้วย เพื่อให้ป้ายเปลี่ยนเป็นสีเขียวทันทีที่มีการอัปเดตสเต็ปงาน
-                        const currentStage = order.craft_status || order.status;
+                        const rawStage = order.craft_status || order.status || 'order_placed';
+                        const displayStageText = STAGE_LABELS[rawStage] || rawStage;
                         const isApproved = order.status !== 'unpaid' || (order.craft_status && order.craft_status !== 'unpaid');
                         const isDeposit = order.payment_type === 'deposit';
 
@@ -81,12 +92,12 @@ export const CraftTrackingTab = () => {
 
                                     <div className="flex items-center gap-2">
                                         {isApproved ? (
-                                            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold rounded-full flex items-center gap-1">
-                                                🟢 กำลังรังสรรค์งานคราฟต์ ({currentStage})
+                                            <span className="px-3.5 py-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold rounded-full flex items-center gap-1.5 shadow-sm">
+                                                🟢 ติดตามสถานะคำสั่งซื้อ: <span className="underline">{displayStageText}</span>
                                             </span>
                                         ) : (
-                                            <span className="px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold rounded-full flex items-center gap-1">
-                                                🔴 ยังไม่ได้รับการอนุมัติ (รอร้านค้าตรวจคิว)
+                                            <span className="px-3.5 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold rounded-full flex items-center gap-1.5 shadow-sm">
+                                                🔴 ยังไม่ได้รับการอนุมัติ (ติดต่อร้านค้า)
                                             </span>
                                         )}
                                         <span className="px-3 py-1 bg-[#E8F7F3] text-[#2A9D8F] border border-[#A2D9D2] text-[11px] font-bold rounded-full">
@@ -151,16 +162,20 @@ export const CraftTrackingTab = () => {
 
                                     <div className="space-y-2">
                                         {order.timeline && order.timeline.length > 0 ? (
-                                            order.timeline.map((log, index) => (
-                                                <div key={index} className="p-3 bg-stone-50 rounded-xl border border-stone-100 flex items-start gap-3 text-xs">
-                                                    <div className="w-2 h-2 rounded-full bg-[#2A9D8F] mt-1.5 shrink-0" />
-                                                    <div>
-                                                        <span className="font-bold text-stone-800 block">{log.status_title}</span>
-                                                        <p className="text-stone-500">{log.notes}</p>
-                                                        <span className="text-[10px] text-stone-400">{new Date(log.created_at).toLocaleString('th-TH')}</span>
+                                            order.timeline.map((log, index) => {
+                                                const formattedStatusTitle = STAGE_LABELS[log.status_title] || STAGE_LABELS[log.step] || log.status_title;
+
+                                                return (
+                                                    <div key={index} className="p-3 bg-stone-50 rounded-xl border border-stone-100 flex items-start gap-3 text-xs">
+                                                        <div className="w-2.5 h-2.5 rounded-full bg-[#2A9D8F] mt-1.5 shrink-0 shadow-sm" />
+                                                        <div className="space-y-0.5">
+                                                            <span className="font-bold text-stone-900 block">{formattedStatusTitle}</span>
+                                                            <p className="text-stone-600 font-normal">{log.notes}</p>
+                                                            <span className="text-[10px] text-stone-400 font-mono">{new Date(log.created_at).toLocaleString('th-TH')}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))
+                                                );
+                                            })
                                         ) : (
                                             <p className="text-xs text-stone-400 italic">ยังไม่มีอัปเดตไทม์ไลน์จากช่างฝีมือ</p>
                                         )}

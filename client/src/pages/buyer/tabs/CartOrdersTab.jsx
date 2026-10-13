@@ -207,8 +207,13 @@ export const CartOrdersTab = ({ onSelectTab }) => {
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => {
-                                                    if (onSelectTab) onSelectTab('tracker');
-                                                    else navigate('/buyer-dashboard?tab=tracker');
+                                                    if (onSelectTab) {
+                                                        onSelectTab('tracker');
+                                                    } else {
+                                                        // Fallback ถ้าไม่มี onSelectTab ส่งมา ให้สั่งเปลี่ยน URL หรือบังคับรีเฟรชหน้าไปแท็บ tracker
+                                                        window.location.href = '#tracker';
+                                                        window.location.reload();
+                                                    }
                                                 }}
                                                 className="px-3 py-1.5 bg-[#E8F7F3] text-[#2A9D8F] hover:bg-[#D8F3DC] rounded-xl text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
                                             >
