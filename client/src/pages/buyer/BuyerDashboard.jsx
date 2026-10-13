@@ -174,7 +174,7 @@ export const BuyerDashboard = () => {
                     <div className="clay-card p-6 sm:p-8 rounded-3xl border border-white shadow-xl min-h-[600px] bg-white/95 backdrop-blur-md">
                         {activeTab === 'profile' && <ProfileTab onProfileUpdated={handleProfileUpdated} />}
                         {activeTab === 'wishlist' && <WishlistTab />}
-                        {activeTab === 'cart-orders' && <CartOrdersTab />}
+                        {activeTab === 'cart-orders' && <CartOrdersTab onSelectTab={setActiveTab} />}
                         {activeTab === 'tracking' && <CraftTrackingTab />}
                         {activeTab === 'history' && <HistoryTab />}
                         {activeTab === 'stats' && <StatsTab />}
