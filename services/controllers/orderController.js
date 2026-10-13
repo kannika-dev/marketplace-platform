@@ -111,7 +111,7 @@ export const createOrder = async (req, res) => {
 };
 
 /**
- * Get orders for currently logged in buyer (รองรับเส้น /orders/my-orders ดึง timeline และรูปภาพครบถ้วน)
+ * Get orders for currently logged in buyer (ดึงข้อมูล timeline, notes และ image_url ครบถ้วน)
  */
 export const getMyOrders = async (req, res) => {
   try {
@@ -131,9 +131,12 @@ export const getMyOrders = async (req, res) => {
         [order.id]
       );
 
-      // ดึงประวัติไทม์ไลน์ทั้งหมดพร้อมรูปภาพและโน้ต
+      // ดึงประวัติไทม์ไลน์ทั้งหมด พร้อมระบุฟิลด์ image_url และ notes ให้ตรงกับฐานข้อมูลจริง
       const [logs] = await pool.query(
-        `SELECT * FROM craft_tracking_logs WHERE order_id = ? ORDER BY created_at ASC`,
+        `SELECT id, order_id, step, status_title, notes, image_url, created_at 
+         FROM craft_tracking_logs 
+         WHERE order_id = ? 
+         ORDER BY created_at ASC`,
         [order.id]
       );
 
@@ -197,7 +200,10 @@ export const getOrderById = async (req, res) => {
     );
 
     const [timeline] = await pool.query(
-      'SELECT * FROM craft_tracking_logs WHERE order_id = ? ORDER BY created_at ASC',
+      `SELECT id, order_id, step, status_title, notes, image_url, created_at 
+       FROM craft_tracking_logs 
+       WHERE order_id = ? 
+       ORDER BY created_at ASC`,
       [id]
     );
 

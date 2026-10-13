@@ -781,15 +781,18 @@ export const getSellerOrders = async (req, res) => {
 
 /**
  * Update craft journey / production status
- * (อัปเดตเฉพาะ craft_status และบันทึก Log ลง craft_tracking_logs โดยไม่กระทบสถานะการชำระเงิน)
+ * (บันทึกข้อมูลสเต็ป ข้อความ และรูปภาพลงตาราง craft_tracking_logs ตรงตามฟิลด์จริงเป๊ะๆ)
  */
 export const updateCraftStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const craft_status = req.body.craft_status || 'order_placed';
-    const step_title = req.body.step_title || req.body.craft_status || 'อัปเดตความคืบหน้า';
-    const note = req.body.note || '';
 
+    // ดึงค่าจาก req.body (รองรับทั้ง craft_status และ step)
+    const craft_status = req.body.craft_status || req.body.step || 'order_placed';
+    const step_title = req.body.step_title || req.body.status_title || craft_status;
+    const note = req.body.note || req.body.notes || '';
+
+    // อัปโหลดและรับลิงก์รูปภาพจาก Cloudinary
     let imageUrl = null;
     if (req.file) {
       imageUrl = getSecureCloudinaryUrl(req.file);
@@ -797,23 +800,23 @@ export const updateCraftStatus = async (req, res) => {
       imageUrl = req.body.image_url;
     }
 
+    // 1. อัปเดต craft_status ล่าสุดในตาราง orders
     await pool.query(
       'UPDATE orders SET craft_status = ? WHERE id = ?',
       [craft_status, orderId]
     );
 
-    const safeStep = String(craft_status || 'processing').substring(0, 50);
-    const finalTitle = String(step_title || craft_status).substring(0, 255);
-
+    // 2. บันทึกลงตาราง craft_tracking_logs ตามชื่อฟิลด์จริง (step, status_title, notes, image_url)
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
        VALUES (?, ?, ?, ?, ?, NOW())`,
-      [orderId, safeStep, finalTitle, note, imageUrl]
+      [orderId, craft_status, step_title, note, imageUrl]
     );
 
     return res.json({
       success: true,
-      message: 'อัปเดตสเต็ปงานคราฟต์และรูปภาพเรียบร้อยแล้ว'
+      message: 'อัปเดตสเต็ปงานคราฟต์ ข้อความ และรูปภาพเรียบร้อยแล้ว',
+      image_url: imageUrl
     });
   } catch (error) {
     console.error('updateCraftStatus Error:', error);

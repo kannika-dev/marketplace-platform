@@ -13,6 +13,29 @@ const STAGE_LABELS = {
     'completed': '07 // เสร็จสมบูรณ์ (Completed)'
 };
 
+// ฟังก์ชันช่วยแมตช์ข้อความหัวข้อช้อยส์ให้แสดงผลสวยงามเสมอ
+const resolveStageLabel = (title, step) => {
+    const raw = (title || step || '').trim();
+    if (STAGE_LABELS[raw]) return STAGE_LABELS[raw];
+
+    // ค้นหาคีย์ที่มีความเกี่ยวข้อง
+    const lower = raw.toLowerCase();
+    if (lower.includes('material') || lower.includes('วัตถุดิบ')) return STAGE_LABELS['material_prep'];
+    if (lower.includes('craft') || lower.includes('ขึ้นรูป') || lower.includes('ประดิษฐ์')) return STAGE_LABELS['crafting'];
+    if (lower.includes('custom') || lower.includes('สลัก')) return STAGE_LABELS['customizing'];
+    if (lower.includes('quality') || lower.includes('ตรวจสอบ')) return STAGE_LABELS['quality_check'];
+    if (lower.includes('ship') || lower.includes('จัดส่ง')) return STAGE_LABELS['shipped'];
+    if (lower.includes('complete') || lower.includes('เสร็จ')) return STAGE_LABELS['completed'];
+    if (lower.includes('placed') || lower.includes('คำสั่งซื้อ')) return STAGE_LABELS['order_placed'];
+
+    // ถ้าไม่มีคำตรงกัน แต่มีข้อความยาวๆ ส่งมา ให้แสดงข้อความนั้นเลย (ยกเว้นคำว่า "อัปเดตความคืบหน้า" โล้นๆ)
+    if (raw && raw !== 'อัปเดตความคืบหน้า') {
+        return raw;
+    }
+
+    return '01 // รับคำสั่งซื้อ/รอชำระเงิน (Order Placed)';
+};
+
 export const CraftTrackingTab = () => {
     const [trackingOrders, setTrackingOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -137,7 +160,7 @@ export const CraftTrackingTab = () => {
                                     </div>
                                 </div>
 
-                                {/* 💬 Reply Message Zone: ดึงข้อความเหตุผลจากคนขายมาแสดงโดยตรง */}
+                                {/* 💬 Reply Message Zone */}
                                 <div className={`p-4 rounded-2xl border text-xs space-y-1 ${isSlipRejected ? 'bg-rose-50/70 border-rose-200' : 'bg-emerald-50/60 border-emerald-100'}`}>
                                     <span className={`font-bold flex items-center gap-1.5 ${isSlipRejected ? 'text-rose-800' : 'text-[#1B4332]'}`}>
                                         <MessageSquare className="w-3.5 h-3.5 text-[#2A9D8F]" /> การตอบกลับจากร้านค้า / ช่างฝีมือ:
@@ -241,25 +264,40 @@ export const CraftTrackingTab = () => {
                                     </h4>
                                     <div className="space-y-2.5">
                                         {order.timeline && order.timeline.length > 0 ? (
-                                            order.timeline.map((log, index) => (
-                                                <div key={index} className="p-3.5 bg-stone-50 rounded-2xl border border-stone-100 space-y-2 text-xs">
-                                                    <div className="flex items-start gap-3">
-                                                        <div className="w-2.5 h-2.5 rounded-full bg-[#2A9D8F] mt-1.5 shrink-0" />
-                                                        <div className="space-y-0.5 flex-1">
-                                                            <span className="font-bold text-stone-900 block">{STAGE_LABELS[log.status_title || log.step] || log.status_title || log.step}</span>
-                                                            <p className="text-stone-600 leading-relaxed">{log.notes}</p>
-                                                            <span className="text-[10px] text-stone-400 font-mono block pt-0.5">{new Date(log.created_at).toLocaleString('th-TH')}</span>
-                                                        </div>
-                                                    </div>
-                                                    {log.image_url && (
-                                                        <div className="pl-5 pt-1">
-                                                            <div onClick={() => setPreviewImage(log.image_url)} className="relative w-28 h-28 rounded-xl overflow-hidden border border-stone-200 cursor-pointer group shadow-sm bg-white">
-                                                                <img src={log.image_url} alt="ความคืบหน้างานคราฟต์" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                            order.timeline.map((log, index) => {
+                                                const resolvedTitle = resolveStageLabel(log.status_title, log.step);
+
+                                                return (
+                                                    <div key={index} className="p-3.5 bg-stone-50 rounded-2xl border border-stone-100 space-y-2 text-xs">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-2.5 h-2.5 rounded-full bg-[#2A9D8F] mt-1.5 shrink-0" />
+                                                            <div className="space-y-0.5 flex-1">
+                                                                <span className="font-bold text-stone-900 block text-sm font-display text-[#1B4332]">
+                                                                    {resolvedTitle}
+                                                                </span>
+                                                                {log.notes && (
+                                                                    <p className="text-stone-700 font-medium leading-relaxed pt-0.5">
+                                                                        {log.notes}
+                                                                    </p>
+                                                                )}
+                                                                <span className="text-[10px] text-stone-400 font-mono block pt-1">
+                                                                    {new Date(log.created_at).toLocaleString('th-TH')}
+                                                                </span>
                                                             </div>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            ))
+                                                        {log.image_url && (
+                                                            <div className="pl-5 pt-2">
+                                                                <div onClick={() => setPreviewImage(log.image_url)} className="relative w-32 h-32 rounded-2xl overflow-hidden border border-stone-200 cursor-pointer group shadow-sm bg-white">
+                                                                    <img src={log.image_url} alt="ความคืบหน้างานคราฟต์" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold">
+                                                                        🔍 ขยายดูรูป
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })
                                         ) : (
                                             <p className="text-xs text-stone-400 italic">ยังไม่มีอัปเดตไทม์ไลน์จากช่างฝีมือ</p>
                                         )}

@@ -31,21 +31,26 @@ export const getSellerOrders = async () => {
   return response.data;
 };
 
-// 🛠️ แก้ไขฟังก์ชันนี้ให้รองรับการส่งรูปภาพผ่าน FormData แบบอัตโนมัติ
+// 🛠️ ปรับปรุงฟังก์ชัน updateCraftStatus ให้แพ็ก FormData ส่งรูปภาพและข้อความได้อย่างแม่นยำ
 export const updateCraftStatus = async (orderId, statusData) => {
   let payload = statusData;
   let headers = {};
 
-  // ถ้ามีไฟล์รูปภาพแนบมาด้วย (เช่น image file หรือ formData) ให้แพັກใส่ FormData
+  // ถ้า statusData เป็น FormData อยู่แล้ว ให้ส่งไปตรงๆ ได้เลย
   if (statusData instanceof FormData) {
     payload = statusData;
     headers = { 'Content-Type': 'multipart/form-data' };
-  } else if (statusData && statusData.image) {
+  } else {
+    // ถ้าส่งมาเป็น Object ปกติ ให้ทำการแปลงเป็น FormData เพื่อรองรับไฟล์รูปภาพ
     const formData = new FormData();
-    formData.append('craft_status', statusData.craft_status || '');
-    formData.append('step_title', statusData.step_title || '');
-    formData.append('note', statusData.note || '');
-    formData.append('image', statusData.image);
+    formData.append('craft_status', statusData.craft_status || statusData.step || '');
+    formData.append('step_title', statusData.step_title || statusData.status_title || '');
+    formData.append('note', statusData.note || statusData.notes || '');
+
+    if (statusData.image) {
+      formData.append('image', statusData.image);
+    }
+
     payload = formData;
     headers = { 'Content-Type': 'multipart/form-data' };
   }
