@@ -50,7 +50,7 @@ export const createOrder = async (req, res) => {
     const calculatedDeposit = selectedPaymentType === 'deposit' ? Math.round(totalAmount * 0.5) : totalAmount;
     const calculatedRemaining = selectedPaymentType === 'deposit' ? (totalAmount - calculatedDeposit) : 0;
 
-    // Insert order master (จัดเรียงลำดับคอลัมน์และค่าพารามิเตอร์ให้ตรงกันเป๊ะ 100%)
+    // Insert order master
     const [orderResult] = await connection.query(
       `INSERT INTO orders (buyer_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
@@ -77,10 +77,10 @@ export const createOrder = async (req, res) => {
       );
     }
 
-    // Insert initial craft timeline log
+    // Insert initial craft timeline log (รองรับคอลัมน์ image_url เป็น null สำหรับสเต็ปเริ่มต้น)
     await connection.query(
-      `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, created_at)
-       VALUES (?, 'order_placed', 'คำสั่งซื้อถูกส่งเรียบร้อย', 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน', NOW())`,
+      `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
+       VALUES (?, 'order_placed', 'คำสั่งซื้อถูกส่งเรียบร้อย', 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
       [orderId]
     );
 
@@ -111,7 +111,7 @@ export const createOrder = async (req, res) => {
 };
 
 /**
- * Get orders for currently logged in buyer
+ * Get orders for currently logged in buyer (ดึงข้อมูลไทม์ไลน์พร้อมรูปภาพครบถ้วน)
  */
 export const getBuyerOrders = async (req, res) => {
   try {
@@ -131,6 +131,7 @@ export const getBuyerOrders = async (req, res) => {
         [order.id]
       );
 
+      // ดึงข้อมูลไทม์ไลน์ทั้งหมด รวมถึง image_url ที่ช่างฝีมืออัปเดตเข้ามา
       const [logs] = await pool.query(
         `SELECT * FROM craft_tracking_logs WHERE order_id = ? ORDER BY created_at ASC`,
         [order.id]
@@ -228,8 +229,8 @@ export const uploadPaymentSlip = async (req, res) => {
 
     // Add tracking event
     await pool.query(
-      `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, created_at)
-       VALUES (?, 'payment_uploaded', 'ส่งหลักฐานการชำระเงินแล้ว', 'รอเจ้าหน้าที่แอดมินตรวจสอบสลิปโอนเงิน', NOW())`,
+      `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
+       VALUES (?, 'payment_uploaded', 'ส่งหลักฐานการชำระเงินแล้ว', 'รอเจ้าหน้าที่แอดมินตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
       [id]
     );
 
