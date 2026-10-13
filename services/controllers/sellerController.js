@@ -781,14 +781,18 @@ export const getSellerOrders = async (req, res) => {
 
 /**
  * Update craft journey / production status
- * (บันทึกข้อมูลสเต็ป ข้อความ และรูปภาพลงตาราง craft_tracking_logs ตรงตามฟิลด์จริงเป๊ะๆ)
+ * (บันทึกข้อมูลสเต็ป ข้อความ และรูปภาพลงตาราง craft_tracking_logs โดยยึดค่าที่ส่งมาจากหน้าบ้านแบบเป๊ะๆ)
  */
 export const updateCraftStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    // ดึงค่าจาก req.body (รองรับทั้ง craft_status และ step)
-    const craft_status = req.body.craft_status || req.body.step || 'order_placed';
+    // 🛠️ รับค่า craft_status ที่ส่งตรงมาจากหน้าบ้านแบบตรงไปตรงมา ห้ามบังคับค่าตายตัว
+    const craft_status = req.body.craft_status || req.body.step;
+    if (!craft_status) {
+      return res.status(400).json({ success: false, message: 'กรุณาระบุสถานะขั้นตอนงานคราฟต์' });
+    }
+
     const step_title = req.body.step_title || req.body.status_title || craft_status;
     const note = req.body.note || req.body.notes || '';
 
