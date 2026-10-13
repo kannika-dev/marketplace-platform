@@ -51,11 +51,6 @@ export const ManageOrders = () => {
       if (res && res.data) {
         const orderList = Array.isArray(res.data) ? res.data : (res.data.data || []);
         setOrders(orderList);
-        const initialStatuses = {};
-        orderList.forEach((ord) => {
-          initialStatuses[ord.id] = ord.craft_status || ord.status;
-        });
-        setSelectedStatus(initialStatuses);
       }
     } catch (err) {
       console.warn('Fallback seller orders:', err.message);
@@ -68,16 +63,16 @@ export const ManageOrders = () => {
     fetchOrders();
   }, []);
 
-  // ฟังก์ชันอัปเดตสเต็ปงานคราฟต์ & แนบรูปภาพความคืบหน้า (ส่ง step_title และ image ไปหลังบ้านอย่างถูกต้อง)
+  // ฟังก์ชันอัปเดตสเต็ปงานคราฟต์ & แนบรูปภาพความคืบหน้า
   const handleUpdateStatus = async (orderId) => {
-    const newStatus = selectedStatus[orderId];
-    if (!newStatus) return;
+    const targetOrder = orders.find(o => o.id === orderId);
+    const newStatus = selectedStatus[orderId] || targetOrder?.craft_status || 'material_prep';
 
     setUpdatingId(orderId);
     try {
       const note = customNote[orderId] || '';
       const matched = STATUS_OPTIONS.find((s) => s.value === newStatus);
-      const stepTitleToSend = matched?.label || newStatus; // 👈 ส่งป้ายกำกับข้อความให้ตรงกับ column หลังบ้าน
+      const stepTitleToSend = matched?.label || newStatus;
       const imageFile = updateImageFile[orderId];
 
       const formData = new FormData();
@@ -86,7 +81,7 @@ export const ManageOrders = () => {
       formData.append('note', note);
 
       if (imageFile) {
-        formData.append('image', imageFile); // 👈 แนบไฟล์รูปภาพ (ถ้ามี)
+        formData.append('image', imageFile);
       }
 
       await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
@@ -469,7 +464,7 @@ export const ManageOrders = () => {
                         SELECT NEXT STAGE // เลือกขั้นตอน
                       </label>
                       <select
-                        value={selectedStatus[ord.id] || ord.craft_status || ord.status}
+                        value={selectedStatus[ord.id] !== undefined ? selectedStatus[ord.id] : (ord.craft_status || 'material_prep')}
                         disabled={updatingId === ord.id}
                         onChange={(e) => setSelectedStatus({ ...selectedStatus, [ord.id]: e.target.value })}
                         className="w-full text-xs font-medium p-3 bg-white text-stone-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE6A7] shadow-inner"
