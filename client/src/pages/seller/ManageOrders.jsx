@@ -57,29 +57,44 @@ export const ManageOrders = () => {
     fetchOrders();
   }, []);
 
-  // คำนวณหาขั้นตอนถัดไปอัตโนมัติ
+  // 💡 คำนวณหาขั้นตอนถัดไปอัตโนมัติแบบแม่นยำ (ป้องกันปัญหาสเต็ปค้าง)
   const getNextStageInfo = (currentCraftStatus) => {
-    const currentIndex = STATUS_ORDER.findIndex(s => s.value === currentCraftStatus);
+    const statusStr = String(currentCraftStatus || 'order_placed').trim().toLowerCase();
+
+    // ค้นหาตำแหน่ง Index ของสเต็ปปัจจุบัน
+    const currentIndex = STATUS_ORDER.findIndex(s => s.value.toLowerCase() === statusStr);
+
+    // ถ้าเจอและยังไม่ใช่อันสุดท้าย ขยับไปสเต็ปถัดไป
     if (currentIndex !== -1 && currentIndex < STATUS_ORDER.length - 1) {
       return STATUS_ORDER[currentIndex + 1];
     }
-    // กรณีที่หาไม่เจอ หรืออยู่ที่สเต็ปเริ่มต้น/จบแล้ว
-    if (currentCraftStatus === 'completed') {
+
+    // ถ้าอยู่ที่สเต็ปสุดท้ายแล้ว ('completed') ให้คงไว้ที่เดิม
+    if (statusStr === 'completed') {
       return STATUS_ORDER[STATUS_ORDER.length - 1];
     }
-    return STATUS_ORDER[2]; // Default to material_prep (02)
+
+    // กรณีหาไม่เจอ ให้เริ่มที่สเต็ป 02 (material_prep) เป็นค่าเริ่มต้น
+    return STATUS_ORDER[2];
   };
 
   // ฟังก์ชันกดปุ่ม "ดำเนินการขั้นตอนถัดไป"
   const handleAdvanceNextStage = async (orderId, targetNextStage) => {
+    const stageToSend = targetNextStage || STATUS_ORDER[2];
+
+    if (!stageToSend || !stageToSend.value) {
+      alert('กรุณาระบุขั้นตอนงานคราฟต์ให้ถูกต้อง');
+      return;
+    }
+
     setUpdatingId(orderId);
     try {
       const note = customNote[orderId] || '';
       const imageFile = updateImageFile[orderId];
 
       const formData = new FormData();
-      formData.append('craft_status', targetNextStage.value);
-      formData.append('step_title', targetNextStage.label);
+      formData.append('craft_status', stageToSend.value);
+      formData.append('step_title', stageToSend.label);
       formData.append('note', note);
 
       if (imageFile) {
@@ -90,7 +105,7 @@ export const ManageOrders = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert(`✨ อัปเดตไปยังขั้นตอน "${targetNextStage.label}" เรียบร้อยแล้ว!`);
+      alert(`✨ อัปเดตไปยังขั้นตอน "${stageToSend.label}" เรียบร้อยแล้ว!`);
       setUpdateImageFile({ ...updateImageFile, [orderId]: null });
       setCustomNote({ ...customNote, [orderId]: '' });
       fetchOrders();
