@@ -55,7 +55,7 @@ export const CraftTrackingTab = () => {
         try {
             const res = await uploadPaymentSlip(orderId, file);
             if (res.success) {
-                alert('✨ อัปโหลดสลิปใหม่เรียบร้อยแล้ว! ระบบส่งหลักฐานให้ช่างฝีมือตรวจสอบ');
+                alert('✨ อัปโหลดสลิปสำเร็จ! ระบบส่งหลักฐานให้ช่างฝีมือตรวจสอบ');
                 fetchTrackingData();
             }
         } catch (err) {
@@ -83,7 +83,6 @@ export const CraftTrackingTab = () => {
             fetchTrackingData();
         } catch (err) {
             console.error('Confirm received error:', err);
-            // Fallback ยิงเข้า route สำรองถ้าไม่มี route เฉพาะ
             try {
                 await api.patch(`/seller/orders/${orderId}/craft-status`, {
                     craft_status: 'completed',
@@ -173,22 +172,31 @@ export const CraftTrackingTab = () => {
                         const isCompleted = order.craft_status === 'completed' || order.status === 'completed';
                         const isSlipRejected = order.payment_status === 'rejected' || (latestTimelineNote && latestTimelineNote.includes('สลิปไม่ถูกต้อง'));
 
+                        // 📌 เงื่อนไขเช็กว่า "ร้านยังไม่อนุมัติ" (ให้ล็อกปุ่มแนบสลิปไว้เป็นสีเทา)
+                        // หากสถานะยังเป็น pending หรือ order_placed โดยที่ร้านยังไม่กดรับคำสั่งซื้อ
                         const isPendingApproval =
-                            (order.status === 'pending_approval' || order.craft_status === 'pending_approval' || order.status === 'pending_verification') &&
-                            order.craft_status !== 'order_placed' &&
-                            order.status !== 'order_placed' &&
-                            !order.payment_slip_url &&
-                            !isSlipRejected;
+                            order.craft_status === 'order_placed' ||
+                            order.status === 'pending' ||
+                            order.craft_status === 'pending' ||
+                            (!order.craft_status && !order.payment_status);
 
                         const isPaymentVerified = !isSlipRejected && (
                             order.payment_status === 'paid' ||
                             order.status === 'paid' ||
                             isCompleted ||
-                            (order.craft_status && order.craft_status !== 'order_placed' && order.craft_status !== 'pending_approval' && order.craft_status !== 'pending_verification')
+                            (order.craft_status && order.craft_status !== 'order_placed' && order.craft_status !== 'pending_approval' && order.craft_status !== 'pending_verification' && order.craft_status !== 'pending')
                         );
 
                         const hasUploadedSlip = Boolean(order.payment_slip_url);
                         const isDeposit = order.payment_type === 'deposit';
+
+                        // 📌 ตรวจสอบว่าชิ้นงานเสร็จแล้วหรือยัง (สำหรับเปิดช่องจ่ายเงินงวดที่ 2)
+                        const isProductionFinished =
+                            order.craft_status === 'production_finished' ||
+                            order.craft_status === 'ready_to_ship' ||
+                            (latestLog && (latestLog.status_title?.includes('เสร็จ') || latestLog.step?.includes('เสร็จ')));
+
+                        const remainingAmount = order.remaining_balance || (Number(order.total_amount) - Number(order.deposit_amount || Math.round(order.total_amount * 0.5)));
 
                         return (
                             <div key={order.id} className="clay-card p-6 rounded-3xl border border-stone-200 bg-white shadow-sm space-y-6">
@@ -200,7 +208,7 @@ export const CraftTrackingTab = () => {
                                             <span className="text-stone-400">({new Date(order.created_at).toLocaleDateString('th-TH')})</span>
                                         </div>
 
-                                        {/* 📌 ป้ายแสดงความคืบหน้าล่าสุดสไตล์ Artisan Journal */}
+                                        {/* ป้ายแสดงความคืบหน้าล่าสุด */}
                                         <div className="pt-1">
                                             {isCompleted ? (
                                                 <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-bold rounded-full inline-flex items-center gap-1.5">
@@ -219,7 +227,7 @@ export const CraftTrackingTab = () => {
                                         </div>
                                     </div>
 
-                                    {/* 🔘 ปุ่มดำเนินการฝั่งผู้ซื้อ (ยืนยันรับสินค้า / แจ้งปัญหา) */}
+                                    {/* ปุ่มดำเนินการฝั่งผู้ซื้อ */}
                                     <div className="flex items-center gap-2 shrink-0 flex-wrap pt-2 sm:pt-0">
                                         {!isCompleted && isPaymentVerified && (
                                             <>
@@ -250,7 +258,7 @@ export const CraftTrackingTab = () => {
                                     </div>
                                 </div>
 
-                                {/* 💬 การตอบกลับจากช่างฝีมือ */}
+                                {/* 💬 บันทึกข้อความจากช่างฝีมือ */}
                                 <div className={`p-4 rounded-2xl border text-xs space-y-1 ${isSlipRejected ? 'bg-rose-50/70 border-rose-200' : 'bg-emerald-50/60 border-emerald-100'}`}>
                                     <span className={`font-bold flex items-center gap-1.5 ${isSlipRejected ? 'text-rose-800' : 'text-[#1B4332]'}`}>
                                         <MessageSquare className="w-3.5 h-3.5 text-[#2A9D8F]" /> บันทึกข้อความจากช่างฝีมือ:
@@ -258,9 +266,9 @@ export const CraftTrackingTab = () => {
                                     <p className={`pl-5 font-medium ${isSlipRejected ? 'text-rose-700 font-bold' : 'text-stone-600'}`}>
                                         {latestTimelineNote || order.seller_reply || (
                                             isPaymentVerified
-                                                ? 'ร้านค้าตรวจสอบสลิปถูกต้อง กำลังประดิษฐ์ผลงานอย่างพิถีพิถันครับ'
+                                                ? 'ร้านค้าตรวจสอบสลิปเรียบร้อย กำลังรังสรรค์ผลงานครับ'
                                                 : isPendingApproval
-                                                    ? 'อยู่ระหว่างรอผู้ขายตรวจสอบคิวงาน Made-to-Order'
+                                                    ? 'ส่งคำสั่งซื้อสำเร็จ อยู่ระหว่างรอร้านค้าตรวจสอบและกดอนุมัติรับคำสั่งซื้อ'
                                                     : 'ร้านค้าอนุมัติคำสั่งซื้อแล้ว สามารถโอนเงินและแนบสลิปได้เลยค่ะ'
                                         )}
                                     </p>
@@ -274,7 +282,7 @@ export const CraftTrackingTab = () => {
                                         <p className="text-stone-500 whitespace-pre-line">{order.shipping_address}</p>
                                     </div>
 
-                                    {/* สถานะชำระเงิน & สลิป */}
+                                    {/* สถานะชำระเงิน & ช่องแนบสลิป (งวดที่ 1 และ งวดที่ 2 สำหรับมัดจำ) */}
                                     <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-xs space-y-3 flex flex-col justify-between">
                                         <div className="space-y-1.5">
                                             <span className="font-bold text-stone-800 block">สถานะการชำระเงิน &amp; หลักฐาน:</span>
@@ -282,19 +290,19 @@ export const CraftTrackingTab = () => {
                                                 <span>ยอดรวมทั้งหมด:</span>
                                                 <span className="font-bold text-stone-900">฿{Number(order.total_amount).toLocaleString()}</span>
                                             </div>
+                                            {isDeposit && (
+                                                <div className="flex justify-between text-stone-500 text-[11px]">
+                                                    <span>มัดจำงวดแรก (50%):</span>
+                                                    <span>฿{Number(order.deposit_amount || Math.round(order.total_amount * 0.5)).toLocaleString()}</span>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        {isPaymentVerified ? (
-                                            <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between gap-3">
-                                                <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
-                                                    <CheckCircle className="w-4 h-4 text-emerald-600" /> สลิปถูกต้อง ตรวจสอบเรียบร้อยแล้ว
-                                                </span>
-                                                {order.payment_slip_url && (
-                                                    <button type="button" onClick={() => setPreviewImage(order.payment_slip_url)} className="p-1.5 bg-white text-stone-600 hover:text-[#2A9D8F] rounded-lg cursor-pointer border border-stone-200">
-                                                        <Eye className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
+                                        {/* 📌 กรณีที่ 1: รอร้านอนุมัติ (ล็อกปุ่มแนบสลิป ทำทึบ) */}
+                                        {isPendingApproval && !hasUploadedSlip ? (
+                                            <button disabled className="w-full py-2.5 px-4 bg-stone-200 text-stone-400 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed">
+                                                <Lock className="w-3.5 h-3.5" /> <span>แนบสลิปชำระเงิน (รอร้านอนุมัติคำสั่งซื้อก่อน)</span>
+                                            </button>
                                         ) : isSlipRejected ? (
                                             <div className="p-3 bg-rose-50 rounded-2xl border border-rose-200 space-y-2">
                                                 <div className="flex items-center justify-between">
@@ -313,7 +321,7 @@ export const CraftTrackingTab = () => {
                                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
                                                 </label>
                                             </div>
-                                        ) : hasUploadedSlip ? (
+                                        ) : hasUploadedSlip && !isPaymentVerified ? (
                                             <div className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between gap-3">
                                                 <div className="flex items-center gap-2.5 overflow-hidden">
                                                     <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-stone-200 shrink-0 bg-stone-100">
@@ -333,10 +341,30 @@ export const CraftTrackingTab = () => {
                                                     </label>
                                                 </div>
                                             </div>
-                                        ) : isPendingApproval ? (
-                                            <button disabled className="w-full py-2.5 px-4 bg-stone-200 text-stone-400 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed">
-                                                <Lock className="w-3.5 h-3.5" /> <span>แนบสลิปชำระเงิน (รอร้านอนุมัติ)</span>
-                                            </button>
+                                        ) : isPaymentVerified && isDeposit && isProductionFinished ? (
+                                            /* 📌 กรณีที่ 2: งานมัดจำเสร็จแล้ว เปิดช่องให้แนบสลิปรอบสอง (ยอดคงเหลือ) */
+                                            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2.5">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="font-bold text-amber-900">✨ ผลงานเสร็จแล้ว! ชำระยอดคงเหลือ:</span>
+                                                    <span className="text-sm font-extrabold text-[#E76F51]">฿{remainingAmount.toLocaleString()}</span>
+                                                </div>
+                                                <label className="w-full py-2.5 px-4 btn-3d-peach text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
+                                                    <Upload className="w-4 h-4" />
+                                                    <span>แนบสลิปชำระยอดคงเหลือ ฿{remainingAmount.toLocaleString()}</span>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
+                                                </label>
+                                            </div>
+                                        ) : isPaymentVerified ? (
+                                            <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between gap-3">
+                                                <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
+                                                    <CheckCircle className="w-4 h-4 text-emerald-600" /> สลิปถูกต้อง ตรวจสอบเรียบร้อยแล้ว
+                                                </span>
+                                                {order.payment_slip_url && (
+                                                    <button type="button" onClick={() => setPreviewImage(order.payment_slip_url)} className="p-1.5 bg-white text-stone-600 hover:text-[#2A9D8F] rounded-lg cursor-pointer border border-stone-200">
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         ) : (
                                             <label className="w-full py-2.5 px-4 btn-3d-peach text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
                                                 <Upload className="w-4 h-4" />
