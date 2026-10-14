@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import ImageUploadDropzone from '../../components/common/ImageUploadDropzone';
 import {
   DollarSign, ShoppingBag, Package, Hammer,
-  TrendingUp, Plus, CheckCircle, Clock, Store, Loader2, AlertCircle, MessageSquare, Send, Sparkles
+  TrendingUp, Plus, CheckCircle, Store, Loader2, AlertCircle, MessageSquare, Send, Sparkles, ChevronRight
 } from 'lucide-react';
 
 function Dashboard() {
@@ -42,7 +42,7 @@ function Dashboard() {
       const [analyticsRes, productsRes, ordersRes, shopRes, reviewsRes] = await Promise.allSettled([
         api.get(`/shops/analytics/${currentUser.id}`),
         api.get(`/seller/products`),
-        api.get(`/seller/orders`), // ใช้ API สั่งดึงออเดอร์ของผู้ขายโดยตรง
+        api.get(`/seller/orders`), // ดึงออเดอร์ของผู้ขายโดยตรง
         api.get(`/shops/seller/${currentUser.id}`),
         api.get(`/seller/reviews`)
       ]);
@@ -83,22 +83,6 @@ function Dashboard() {
 
     return () => clearTimeout(fallbackTimer);
   }, [currentUser]);
-
-  // ฟังก์ชันอัปเดตสเต็ปงานคราฟต์ตรงเข้า API /seller/orders/:orderId/craft-status
-  const handleUpdateOrderStatus = async (orderId, newStatus, stepTitle) => {
-    try {
-      await api.patch(`/seller/orders/${orderId}/craft-status`, {
-        craft_status: newStatus,
-        step_title: stepTitle || (newStatus === 'completed' ? 'ประดิษฐ์เสร็จสิ้น' : 'กำลังขึ้นรูปประดิษฐ์'),
-        note: newStatus === 'completed' ? 'ชิ้นงานสร้างสรรค์เสร็จสมบูรณ์ พร้อมจัดส่ง' : 'เริ่มกระบวนการประดิษฐ์ชิ้นงาน'
-      });
-      alert('✨ อัปเดตสเต็ปงานคราฟต์เรียบร้อยแล้ว!');
-      fetchDashboardData();
-    } catch (err) {
-      console.error('Update craft status error:', err);
-      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ');
-    }
-  };
 
   const handleUpdateProductSubmit = async (e) => {
     e.preventDefault();
@@ -202,6 +186,8 @@ function Dashboard() {
     );
   }
 
+  const activeCraftOrders = orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled' && o.craft_status !== 'completed');
+
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8 text-stone-800 relative">
 
@@ -303,7 +289,7 @@ function Dashboard() {
             <div className="p-2 rounded-xl bg-purple-100 text-purple-800"><Hammer className="w-5 h-5" /></div>
           </div>
           <span className="text-2xl font-extrabold text-stone-900 block">
-            {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length} ชิ้น
+            {activeCraftOrders.length} ชิ้น
           </span>
           <span className="text-[11px] text-purple-700 font-medium">ชิ้นงาน Handcrafted</span>
         </div>
@@ -341,7 +327,7 @@ function Dashboard() {
               </div>
               <div className="p-4 bg-stone-50 rounded-xl border border-stone-200">
                 <span className="text-xs text-stone-500 font-medium block">ออเดอร์ที่สำเร็จแล้ว</span>
-                <span className="text-xl font-bold text-stone-800">{orders.filter(o => o.status === 'completed').length} รายการ</span>
+                <span className="text-xl font-bold text-stone-800">{orders.filter(o => o.status === 'completed' || o.craft_status === 'completed').length} รายการ</span>
               </div>
               <div className="p-4 bg-stone-50 rounded-xl border border-stone-200">
                 <span className="text-xs text-stone-500 font-medium block">อัตราการซื้อซ้ำ</span>
@@ -392,18 +378,20 @@ function Dashboard() {
           </div>
         )}
 
+        {/* TAB: คำสั่งซื้อทั้งหมด */}
         {activeTab === 'orders' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-bold flex items-center gap-2 text-stone-900">
                 <ShoppingBag className="w-5 h-5 text-blue-600" /> คำสั่งซื้อทั้งหมดจากลูกค้า
               </h3>
-              <button
-                onClick={() => navigate('/seller/orders')}
-                className="text-xs font-bold text-[#2A9D8F] hover:underline cursor-pointer"
+              <Link
+                to="/seller/orders"
+                className="text-xs font-bold text-[#2A9D8F] hover:underline flex items-center gap-1 cursor-pointer"
               >
-                ดูหน้าจัดการสเต็ปงานละเอียด &rarr;
-              </button>
+                <span>ไปที่หน้า จัดการสเต็ปแบบละเอียด (Manage Orders)</span>
+                <ChevronRight className="w-4 h-4" />
+              </Link>
             </div>
             {orders.length === 0 ? (
               <div className="text-center py-10 bg-stone-50 rounded-xl text-stone-400 text-sm border border-stone-200">
@@ -417,12 +405,19 @@ function Dashboard() {
                       <span className="font-bold text-sm block text-stone-900">คำสั่งซื้อ #{ord.id}</span>
                       <span className="text-xs text-stone-500">ลูกค้า: {ord.buyer_name || 'ผู้ซื้อทั่วไป'} | ยอดรวม: ฿{ord.total_amount}</span>
                     </div>
-                    <div>
-                      <span className={`text-xs px-3 py-1 rounded-full font-bold ${ord.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
-                        ord.status === 'crafting' || ord.status === 'in_progress' ? 'bg-amber-100 text-amber-800' : 'bg-stone-200 text-stone-700'
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs px-3 py-1 rounded-full font-bold ${ord.status === 'completed' || ord.craft_status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
+                        ord.craft_status || ord.status ? 'bg-purple-100 text-purple-900' : 'bg-stone-200 text-stone-700'
                         }`}>
-                        {ord.status === 'completed' ? 'ทำเสร็จ/จัดส่งแล้ว' : (ord.craft_status || ord.status)}
+                        สถานะ: {ord.craft_status || ord.status}
                       </span>
+                      <Link
+                        to="/seller/orders"
+                        className="p-1.5 hover:bg-stone-200 rounded-lg text-stone-500 hover:text-emerald-800 transition-colors"
+                        title="ดูรายละเอียดออเดอร์"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
                     </div>
                   </div>
                 ))}
@@ -431,50 +426,46 @@ function Dashboard() {
           </div>
         )}
 
-        {/* TAB: ติดตามสถานะงานช่างฝีมือ */}
+        {/* TAB: ติดตามสถานะงานช่างฝีมือ (ReadOnly + Link to ManageOrders) */}
         {activeTab === 'craft' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
               <h3 className="text-lg font-bold flex items-center gap-2 text-purple-950">
-                <Hammer className="w-5 h-5 text-purple-700" /> ติดตามสถานะงานช่างฝีมือ
+                <Hammer className="w-5 h-5 text-purple-700" /> ติดตามสถานะงานช่างฝีมือ (Craft Tracker)
               </h3>
-              <button
-                onClick={() => navigate('/seller/orders')}
-                className="text-xs font-bold text-[#2A9D8F] hover:underline cursor-pointer"
+              <Link
+                to="/seller/orders"
+                className="text-xs font-mono font-bold text-[#1B4332] hover:text-[#E76F51] flex items-center gap-1 transition-colors"
               >
-                ไปที่หน้า จัดการสเต็ปแบบละเอียด (Manage Orders) &rarr;
-              </button>
+                <span>ไปที่หน้า จัดการสเต็ปแบบละเอียด (Manage Orders)</span>
+                <ChevronRight className="w-4 h-4 text-emerald-700" />
+              </Link>
             </div>
-            <div className="space-y-4">
-              {orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length === 0 ? (
+
+            <div className="space-y-3">
+              {activeCraftOrders.length === 0 ? (
                 <div className="text-center py-10 bg-purple-50/20 rounded-xl text-stone-400 text-sm border border-purple-100">
                   ไม่มีคำสั่งซื้อที่ค้างอยู่ในกระบวนการประดิษฐ์
                 </div>
               ) : (
-                orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').map((craftOrd) => (
-                  <div key={craftOrd.id} className="p-5 rounded-2xl border border-purple-200 bg-purple-50/30 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <span className="font-bold text-sm text-purple-950 block">ออเดอร์งานคราฟต์ #{craftOrd.id}</span>
-                        <span className="text-xs text-stone-500">ผู้สั่งซื้อ: {craftOrd.buyer_name || 'ลูกค้า'}</span>
-                      </div>
-                      <span className="text-xs bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full font-bold">
+                activeCraftOrders.map((craftOrd) => (
+                  <div key={craftOrd.id} className="p-4 rounded-xl border border-purple-200/80 bg-purple-50/30 flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <span className="font-bold text-sm text-purple-950 block">ออเดอร์งานคราฟต์ #{craftOrd.id}</span>
+                      <span className="text-xs text-stone-500">ผู้สั่งซื้อ: {craftOrd.buyer_name || 'ลูกค้า'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs bg-purple-100 text-purple-800 px-3 py-1 rounded-full font-bold border border-purple-200">
                         สถานะปัจจุบัน: {craftOrd.craft_status || craftOrd.status}
                       </span>
-                    </div>
-                    <div className="pt-2 flex gap-2">
-                      <button
-                        onClick={() => handleUpdateOrderStatus(craftOrd.id, 'crafting', '03 // กำลังขึ้นรูปประดิษฐ์ (In Crafting)')}
-                        className="px-3 py-1.5 bg-amber-500 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-amber-600 transition-all cursor-pointer"
+                      <Link
+                        to="/seller/orders"
+                        className="p-1.5 hover:bg-purple-100 rounded-lg text-purple-800 transition-colors"
+                        title="ไปที่หน้าอัปเดตสเต็ปแบบละเอียด"
                       >
-                        <Clock className="w-3.5 h-3.5" /> เริ่มประดิษฐ์ชิ้นงาน
-                      </button>
-                      <button
-                        onClick={() => handleUpdateOrderStatus(craftOrd.id, 'completed', '07 // เสร็จสมบูรณ์ (Completed)')}
-                        className="px-3 py-1.5 bg-emerald-800 text-white text-xs font-bold rounded-lg flex items-center gap-1 hover:bg-emerald-700 transition-all cursor-pointer"
-                      >
-                        <CheckCircle className="w-3.5 h-3.5" /> ประดิษฐ์เสร็จสิ้น
-                      </button>
+                        <ChevronRight className="w-5 h-5" />
+                      </Link>
                     </div>
                   </div>
                 ))
