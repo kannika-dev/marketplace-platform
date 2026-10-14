@@ -24,7 +24,10 @@ router.post('/products', upload.single('image'), addProduct);
 router.put('/products/:id', upload.single('image'), updateProduct);
 router.delete('/products/:id', deleteProduct);
 router.get('/orders', getSellerOrders);
-router.patch('/orders/:orderId/craft-status', updateCraftStatus);
+
+// 📌 เติม upload.single('image') ตรงนี้ เพื่อให้รับรูปภาพความคืบหน้าได้ฉลุย!
+router.patch('/orders/:orderId/craft-status', upload.single('image'), updateCraftStatus);
+
 router.get('/reviews', getSellerReviews);
 router.put('/reviews/:reviewId/reply', replyToReview);
 
