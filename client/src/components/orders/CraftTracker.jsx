@@ -24,7 +24,7 @@ export const CraftTracker = ({ currentStatus = 'order_placed', timelineLogs = []
 
   return (
     <div className="clay-card p-7 rounded-3xl space-y-7 border border-white/90">
-      
+
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-emerald-100/70">
         <div>
@@ -47,7 +47,7 @@ export const CraftTracker = ({ currentStatus = 'order_placed', timelineLogs = []
 
       {/* Visual 3D Stepper */}
       <div className="relative pt-2">
-        
+
         {/* Progress connecting line */}
         <div className="hidden md:block absolute top-1/2 left-8 right-8 -translate-y-5 h-2 bg-[#E8F7F3] rounded-full z-0 overflow-hidden">
           <div
@@ -66,16 +66,15 @@ export const CraftTracker = ({ currentStatus = 'order_placed', timelineLogs = []
 
             return (
               <div key={step.key} className="flex flex-col items-center text-center group">
-                
+
                 {/* Step 3D Circle */}
                 <div
-                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 ${
-                    isCurrent
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 ${isCurrent
                       ? 'btn-3d-peach text-white scale-110 shadow-[0_12px_24px_rgba(231,111,81,0.45)] ring-4 ring-[#FFE8D6]'
                       : isCompleted
-                      ? 'btn-3d-botanical text-white shadow-[0_8px_16px_rgba(42,157,143,0.35)]'
-                      : 'bg-white/90 text-stone-400 border border-emerald-100 shadow-sm'
-                  }`}
+                        ? 'btn-3d-botanical text-white shadow-[0_8px_16px_rgba(42,157,143,0.35)]'
+                        : 'bg-white/90 text-stone-400 border border-emerald-100 shadow-sm'
+                    }`}
                 >
                   {isCompleted ? (
                     <CheckCircle2 className="w-7 h-7 text-white stroke-[2.5]" />
@@ -86,9 +85,8 @@ export const CraftTracker = ({ currentStatus = 'order_placed', timelineLogs = []
 
                 {/* Step Info */}
                 <span
-                  className={`mt-3 text-xs font-bold ${
-                    isCurrent ? 'text-[#E76F51]' : isCompleted ? 'text-[#2A9D8F]' : 'text-stone-400'
-                  }`}
+                  className={`mt-3 text-xs font-bold ${isCurrent ? 'text-[#E76F51]' : isCompleted ? 'text-[#2A9D8F]' : 'text-stone-400'
+                    }`}
                 >
                   {step.label}
                 </span>
