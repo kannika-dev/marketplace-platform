@@ -57,28 +57,19 @@ export const ManageOrders = () => {
     fetchOrders();
   }, []);
 
-  // 💡 คำนวณหาขั้นตอนถัดไปอัตโนมัติแบบแม่นยำ (ป้องกันปัญหาสเต็ปค้าง)
   const getNextStageInfo = (currentCraftStatus) => {
     const statusStr = String(currentCraftStatus || 'order_placed').trim().toLowerCase();
-
-    // ค้นหาตำแหน่ง Index ของสเต็ปปัจจุบัน
     const currentIndex = STATUS_ORDER.findIndex(s => s.value.toLowerCase() === statusStr);
 
-    // ถ้าเจอและยังไม่ใช่อันสุดท้าย ขยับไปสเต็ปถัดไป
     if (currentIndex !== -1 && currentIndex < STATUS_ORDER.length - 1) {
       return STATUS_ORDER[currentIndex + 1];
     }
-
-    // ถ้าอยู่ที่สเต็ปสุดท้ายแล้ว ('completed') ให้คงไว้ที่เดิม
     if (statusStr === 'completed') {
       return STATUS_ORDER[STATUS_ORDER.length - 1];
     }
-
-    // กรณีหาไม่เจอ ให้เริ่มที่สเต็ป 02 (material_prep) เป็นค่าเริ่มต้น
     return STATUS_ORDER[2];
   };
 
-  // ฟังก์ชันกดปุ่ม "ดำเนินการขั้นตอนถัดไป"
   const handleAdvanceNextStage = async (orderId, targetNextStage) => {
     const stageToSend = targetNextStage || STATUS_ORDER[2];
 
@@ -93,10 +84,11 @@ export const ManageOrders = () => {
       const imageFile = updateImageFile[orderId];
 
       const formData = new FormData();
-      formData.append('craft_status', stageToSend.value);
-      formData.append('step_title', stageToSend.label);
-      formData.append('note', note);
+      formData.append('craft_status', String(stageToSend.value));
+      formData.append('step_title', String(stageToSend.label));
+      formData.append('note', String(note));
 
+      // แนบไฟล์รูปภาพไปพร้อมกับ FormData
       if (imageFile) {
         formData.append('image', imageFile);
       }
@@ -117,7 +109,6 @@ export const ManageOrders = () => {
     }
   };
 
-  // ฟังก์ชันอนุมัติคำสั่งซื้อ (ปลดล็อกให้ลูกค้าแนบสลิป)
   const handleApproveOrder = async (orderId) => {
     if (!window.confirm('คุณต้องการอนุมัติคำสั่งซื้อนี้ เพื่อเปิดให้ลูกค้าแนบสลิปชำระเงินใช่หรือไม่?')) return;
 
@@ -132,7 +123,7 @@ export const ManageOrders = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert('✨ อนุมัติคำสั่งซื้อสำเร็จ! ปลดล็อกช่องแนบสลิปให้ฝั่งผู้ซื้อแล้วจ้า');
+      alert('✨ อนุมัติคำสั่งซื้อสำเร็จ!');
       fetchOrders();
     } catch (err) {
       console.error('Approve order error:', err);
@@ -142,9 +133,8 @@ export const ManageOrders = () => {
     }
   };
 
-  // ฟังก์ชันกด "ยืนยันสลิปถูกต้อง"
   const handleApprovePayment = async (orderId) => {
-    if (!window.confirm('คุณต้องการยืนยันว่าสลิปการชำระเงินถูกต้องและอนุมัติยอดเงินใช่หรือไม่?')) return;
+    if (!window.confirm('คุณต้องการยืนยันว่าสลิปการชำระเงินถูกต้องใช่หรือไม่?')) return;
 
     setUpdatingId(orderId);
     try {
@@ -157,7 +147,7 @@ export const ManageOrders = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert('✨ ยืนยันสลิปถูกต้องและอนุมัติยอดเงินเรียบร้อยแล้ว!');
+      alert('✨ ยืนยันสลิปถูกต้องแล้ว!');
       fetchOrders();
     } catch (err) {
       console.error('Approve payment error:', err);
@@ -167,9 +157,8 @@ export const ManageOrders = () => {
     }
   };
 
-  // ฟังก์ชันกรณีสลิปไม่ถูกต้อง / ขอหลักฐานใหม่
   const handleRejectSlip = async (orderId) => {
-    const reason = prompt('กรุณาระบุเหตุผลที่สลิปไม่ถูกต้อง (เช่น ยอดเงินไม่ตรง, รูปสลิปเบลอ/ไม่ชัดเจน):');
+    const reason = prompt('กรุณาระบุเหตุผลที่สลิปไม่ถูกต้อง:');
     if (!reason) return;
 
     setUpdatingId(orderId);
@@ -232,8 +221,6 @@ export const ManageOrders = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10 editorial-canvas">
-
-      {/* 📖 Navigation Header */}
       <div className="flex items-center justify-between border-b border-stone-200 pb-4">
         <Link
           to="/seller/dashboard"
@@ -242,12 +229,8 @@ export const ManageOrders = () => {
           <ArrowLeft className="w-4 h-4" />
           <span>RETURN TO ARTISAN DASHBOARD</span>
         </Link>
-        <span className="text-[11px] font-mono tracking-widest text-stone-400 uppercase hidden sm:inline">
-          PRODUCTION CONTROL // CRAFT JOURNAL 2026
-        </span>
       </div>
 
-      {/* 📖 Editorial Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-2 border-stone-900 pb-8">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1B4332] text-white text-[10px] font-mono tracking-widest uppercase">
@@ -257,12 +240,8 @@ export const ManageOrders = () => {
           <h1 className="text-3xl sm:text-5xl font-display font-extrabold text-stone-900 tracking-tight leading-tight">
             จัดการคำสั่งซื้อ <span className="font-serif italic text-[#1B4332] font-normal">&amp; สเต็ปงานคราฟต์</span>
           </h1>
-          <p className="text-xs sm:text-sm text-stone-600 max-w-xl font-normal leading-relaxed">
-            ตรวจสอบสลิปโอนเงิน อัปเดตความคืบหน้า และถ่ายทอดเรื่องราวการรังสรรค์ชิ้นงานส่งตรงถึงผู้ซื้อผ่าน Crafting Journey Tracker
-          </p>
         </div>
 
-        {/* Filter Dropdown */}
         <div className="flex items-center gap-2 bg-stone-100 p-1.5 rounded-2xl border border-stone-200">
           <SlidersHorizontal className="w-4 h-4 text-[#1B4332] ml-2" />
           <select
@@ -280,7 +259,6 @@ export const ManageOrders = () => {
         </div>
       </div>
 
-      {/* 📖 List Section */}
       {loading ? (
         <div className="text-center py-24 text-stone-400 font-mono text-xs uppercase tracking-widest animate-pulse">
           LOADING ARTISAN ORDERS...
@@ -289,7 +267,6 @@ export const ManageOrders = () => {
         <div className="text-center py-24 bg-stone-50 rounded-3xl border border-dashed border-stone-300 p-8 space-y-3">
           <PackageOpen className="w-12 h-12 text-stone-400 mx-auto" />
           <p className="text-sm font-display font-bold text-stone-700">ไม่พบรายการคำสั่งซื้อในหมวดหมู่นี้</p>
-          <p className="text-xs text-stone-500 font-mono">No order records found in selected stage.</p>
         </div>
       ) : (
         <div className="space-y-8">
@@ -307,7 +284,6 @@ export const ManageOrders = () => {
                 key={ord.id}
                 className="bg-white rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl border border-stone-200/80 hover:border-[#1B4332]/30 transition-all"
               >
-                {/* Header Card Status Badges */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-stone-200 gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-3 flex-wrap">
@@ -317,48 +293,20 @@ export const ManageOrders = () => {
                       <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold border border-emerald-200">
                         🛠️ STAGE: {currentCraftStatus}
                       </span>
-                      {isPendingApproval ? (
-                        <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full font-bold border bg-amber-50 text-amber-800 border-amber-200">
-                          🟡 รอร้านค้าอนุมัติคิวงาน
-                        </span>
-                      ) : isPaymentVerified ? (
-                        <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full font-bold border bg-emerald-50 text-emerald-800 border-emerald-200 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3 text-emerald-600" /> ชำระเงินแล้ว
-                        </span>
-                      ) : isSlipRejected ? (
-                        <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full font-bold border bg-rose-50 text-rose-700 border-rose-200 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-rose-600" /> สลิปไม่ถูกต้อง
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full font-bold border bg-amber-50 text-amber-800 border-amber-200">
-                          ⏳ รอตรวจสอบการชำระเงิน
-                        </span>
-                      )}
                     </div>
                     <p className="text-xs text-stone-700 pt-1">
-                      ผู้สั่งซื้อ: <strong className="font-bold text-stone-900">{ord.buyer_name || 'ลูกค้า'}</strong> <span className="text-stone-400 font-mono">({ord.buyer_email || '-'})</span>
-                    </p>
-                    <p className="text-[11px] text-stone-500 font-normal">
-                      📍 ที่อยู่จัดส่ง: {ord.shipping_address}
+                      ผู้สั่งซื้อ: <strong className="font-bold text-stone-900">{ord.buyer_name || 'ลูกค้า'}</strong>
                     </p>
                   </div>
 
-                  <div className="text-left sm:text-right bg-stone-50 p-4 rounded-2xl border border-stone-100 min-w-[180px] flex flex-col justify-between">
-                    <div>
-                      <span className="text-[10px] font-mono tracking-widest text-stone-400 uppercase block">TOTAL AMOUNT</span>
-                      <span className="text-2xl font-display font-extrabold text-[#E76F51]">
-                        ฿{Number(ord.total_amount).toLocaleString()}
-                      </span>
-                    </div>
-                    {ord.payment_type === 'deposit' && (
-                      <span className="text-[10px] text-[#2A9D8F] font-bold pt-1">
-                        มัดจำ 50%: ฿{Number(ord.deposit_amount).toLocaleString()}
-                      </span>
-                    )}
+                  <div className="text-left sm:text-right bg-stone-50 p-4 rounded-2xl border border-stone-100 min-w-[180px]">
+                    <span className="text-[10px] font-mono tracking-widest text-stone-400 uppercase block">TOTAL AMOUNT</span>
+                    <span className="text-2xl font-display font-extrabold text-[#E76F51]">
+                      ฿{Number(ord.total_amount).toLocaleString()}
+                    </span>
                   </div>
                 </div>
 
-                {/* 📄 Payment Slip & Order Review Zone */}
                 <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     {ord.payment_slip_url ? (
@@ -376,35 +324,18 @@ export const ManageOrders = () => {
                         ไม่มีสลิป
                       </div>
                     )}
-                    <div className="space-y-1">
-                      <span className="font-bold text-xs text-stone-900 block flex items-center gap-1.5">
-                        📄 หลักฐานการโอนเงิน &amp; การจัดการออเดอร์
-                      </span>
-                      <p className="text-[11px] text-stone-500">
-                        {isPendingApproval
-                          ? 'ออเดอร์ใหม่รอดำเนินการ: กดปุ่มอนุมัติรับคำสั่งซื้อเพื่อให้ลูกค้าแนบสลิป'
-                          : ord.payment_slip_url
-                            ? (isPaymentVerified
-                              ? '✅ ตรวจสอบสลิปและอนุมัติยอดเงินเรียบร้อยแล้ว'
-                              : isSlipRejected
-                                ? '❌ สลิปถูกตีกลับ เนื่องจากไม่ถูกต้อง'
-                                : 'ลูกค้าแนบสลิปมาแล้ว ตรวจสอบความถูกต้องและกดยืนยันได้เลย')
-                            : 'อนุมัติออเดอร์แล้ว รอให้ลูกค้าโอนเงินและแนบสลิป'}
-                      </p>
-                    </div>
+                    <span className="font-bold text-xs text-stone-900">หลักฐานการโอนเงิน &amp; การจัดการออเดอร์</span>
                   </div>
 
-                  {/* Action Buttons Zone */}
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     {isPendingApproval && (
                       <button
                         type="button"
                         disabled={updatingId === ord.id}
                         onClick={() => handleApproveOrder(ord.id)}
-                        className="px-4 py-2.5 bg-[#2A9D8F] hover:bg-[#21867a] text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        className="px-4 py-2.5 bg-[#2A9D8F] hover:bg-[#21867a] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>{updatingId === ord.id ? 'กำลังอนุมัติ...' : '✅ อนุมัติรับคำสั่งซื้อ'}</span>
+                        ✅ อนุมัติรับคำสั่งซื้อ
                       </button>
                     )}
 
@@ -414,32 +345,23 @@ export const ManageOrders = () => {
                           type="button"
                           disabled={updatingId === ord.id}
                           onClick={() => handleApprovePayment(ord.id)}
-                          className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
                         >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>{updatingId === ord.id ? 'กำลังตรวจสอบ...' : '✅ ยืนยันสลิปถูกต้อง'}</span>
+                          ✅ ยืนยันสลิปถูกต้อง
                         </button>
                         <button
                           type="button"
                           disabled={updatingId === ord.id}
                           onClick={() => handleRejectSlip(ord.id)}
-                          className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
                         >
-                          <X className="w-4 h-4" />
-                          <span>❌ สลิปไม่ถูกต้อง</span>
+                          ❌ สลิปไม่ถูกต้อง
                         </button>
                       </>
-                    )}
-
-                    {isPaymentVerified && (
-                      <span className="px-3 py-1.5 bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold rounded-xl flex items-center gap-1">
-                        <CheckCircle className="w-4 h-4 text-emerald-600" /> สลิปถูกต้องแล้ว
-                      </span>
                     )}
                   </div>
                 </div>
 
-                {/* Items List */}
                 <div className="space-y-3">
                   <span className="text-[10px] font-mono tracking-widest uppercase text-stone-400 font-bold block">
                     ORDERED PIECES // {ord.items?.length || 0} ITEM(S)
@@ -450,14 +372,9 @@ export const ManageOrders = () => {
                       className="p-4 bg-stone-50 rounded-2xl text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border border-stone-200/60"
                     >
                       <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-display font-bold text-stone-900 text-sm sm:text-base">
-                            {it.product_title || it.title}
-                          </span>
-                          <span className="bg-[#1B4332] text-[#FFE6A7] text-[10px] font-mono font-bold px-2 py-0.5 rounded-full">
-                            × {it.quantity}
-                          </span>
-                        </div>
+                        <span className="font-display font-bold text-stone-900 text-sm sm:text-base">
+                          {it.product_title || it.title} × {it.quantity}
+                        </span>
                         {renderCustomizationDetails(it.customization_details || it.customization_notes)}
                       </div>
                       <span className="font-mono font-extrabold text-stone-900 text-base shrink-0">
@@ -467,7 +384,6 @@ export const ManageOrders = () => {
                   ))}
                 </div>
 
-                {/* 🚀 Crafting Journey Control Panel (Smart Advance UI) */}
                 <div className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] text-white p-6 rounded-2xl shadow-lg space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
                     <span className="text-xs font-mono font-bold tracking-widest uppercase text-[#FFE6A7] flex items-center gap-2">
@@ -481,14 +397,10 @@ export const ManageOrders = () => {
 
                   {isCompleted ? (
                     <div className="bg-white/10 p-4 rounded-xl text-center space-y-1">
-                      <p className="text-sm font-bold text-[#FFE6A7] flex items-center justify-center gap-1.5">
-                        <CheckCircle className="w-4 h-4 text-emerald-400" /> คำสั่งซื้อนี้เสร็จสมบูรณ์เรียบร้อยแล้ว
-                      </p>
-                      <p className="text-xs text-stone-300 font-mono">This order has reached its final completed stage.</p>
+                      <p className="text-sm font-bold text-[#FFE6A7]">คำสั่งซื้อนี้เสร็จสมบูรณ์เรียบร้อยแล้ว</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* Inputs Zone */}
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                         <div className="md:col-span-8 space-y-1.5">
                           <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
@@ -496,10 +408,10 @@ export const ManageOrders = () => {
                           </label>
                           <input
                             type="text"
-                            placeholder="เช่น กำลังตากชิ้นงานให้แห้งสนิทก่อนลงเตาเผา..."
+                            placeholder="เช่น กำลังตากชิ้นงานให้แห้งสนิท..."
                             value={customNote[ord.id] || ''}
                             onChange={(e) => setCustomNote({ ...customNote, [ord.id]: e.target.value })}
-                            className="w-full text-xs p-3 bg-white text-stone-900 placeholder:text-stone-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE6A7]"
+                            className="w-full text-xs p-3 bg-white text-stone-900 rounded-xl focus:outline-none"
                           />
                         </div>
 
@@ -522,13 +434,12 @@ export const ManageOrders = () => {
                         </div>
                       </div>
 
-                      {/* Single Big Advance Action Button */}
                       <div className="pt-2">
                         <button
                           type="button"
                           disabled={updatingId === ord.id}
                           onClick={() => handleAdvanceNextStage(ord.id, nextStage)}
-                          className="w-full py-3.5 px-6 rounded-xl text-xs font-bold uppercase tracking-wider shadow-xl bg-gradient-to-r from-[#E76F51] to-[#f4a261] hover:from-[#d95d3f] hover:to-[#e76f51] text-white flex items-center justify-center gap-2.5 transition-all transform active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                          className="w-full py-3.5 px-6 rounded-xl text-xs font-bold uppercase tracking-wider shadow-xl bg-gradient-to-r from-[#E76F51] to-[#f4a261] text-white flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50"
                         >
                           <Send className="w-4 h-4 shrink-0" />
                           <span>
@@ -541,31 +452,21 @@ export const ManageOrders = () => {
                     </div>
                   )}
                 </div>
-
               </div>
             );
           })}
         </div>
       )}
 
-      {/* MODAL LIGHTBOX */}
       {previewImage && (
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setPreviewImage(null)}
         >
-          <div
-            className="relative max-w-lg w-full bg-white rounded-3xl p-4 shadow-2xl space-y-3"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-stone-100 pb-2">
-              <span className="text-xs font-bold text-stone-800 flex items-center gap-1">
-                <ImageIcon className="w-4 h-4 text-[#2A9D8F]" /> ตรวจสอบสลิป / รูปภาพ
-              </span>
-              <button
-                onClick={() => setPreviewImage(null)}
-                className="p-1 hover:bg-stone-100 rounded-full text-stone-400 hover:text-stone-700"
-              >
+          <div className="relative max-w-lg w-full bg-white rounded-3xl p-4 shadow-2xl space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b pb-2">
+              <span className="text-xs font-bold text-stone-800">ตรวจสอบสลิป / รูปภาพ</span>
+              <button onClick={() => setPreviewImage(null)} className="text-stone-400 hover:text-stone-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -575,7 +476,6 @@ export const ManageOrders = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

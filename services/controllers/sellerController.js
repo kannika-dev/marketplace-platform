@@ -781,36 +781,35 @@ export const getSellerOrders = async (req, res) => {
 
 /**
  * Update craft journey / production status
- * (บันทึกข้อมูลสเต็ป ข้อความ และรูปภาพลงตาราง craft_tracking_logs โดยยึดค่าที่ส่งมาจากหน้าบ้านแบบเป๊ะๆ)
  */
 export const updateCraftStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    // 🛠️ รับค่า craft_status ที่ส่งตรงมาจากหน้าบ้านแบบตรงไปตรงมา ห้ามบังคับค่าตายตัว
-    const craft_status = req.body.craft_status || req.body.step;
-    if (!craft_status) {
-      return res.status(400).json({ success: false, message: 'กรุณาระบุสถานะขั้นตอนงานคราฟต์' });
+    // ดึงค่า status และป้องกันกรณีค่าว่างหรือ undefined
+    let craft_status = req.body?.craft_status || req.body?.step;
+    if (!craft_status || craft_status === 'undefined' || craft_status === 'null') {
+      craft_status = 'crafting';
     }
 
-    const step_title = req.body.step_title || req.body.status_title || craft_status;
-    const note = req.body.note || req.body.notes || '';
+    const step_title = req.body?.step_title || req.body?.status_title || craft_status;
+    const note = req.body?.note || req.body?.notes || '';
 
-    // อัปโหลดและรับลิงก์รูปภาพจาก Cloudinary
+    // รองรับการรับไฟล์ภาพผ่าน multer (req.file) หรือ URL ตรงๆ
     let imageUrl = null;
     if (req.file) {
       imageUrl = getSecureCloudinaryUrl(req.file);
-    } else if (req.body.image_url) {
+    } else if (req.body?.image_url) {
       imageUrl = req.body.image_url;
     }
 
-    // 1. อัปเดต craft_status ล่าสุดในตาราง orders
+    // 1. อัปเดตสถานะล่าสุดในตาราง orders
     await pool.query(
       'UPDATE orders SET craft_status = ? WHERE id = ?',
       [craft_status, orderId]
     );
 
-    // 2. บันทึกลงตาราง craft_tracking_logs ตามชื่อฟิลด์จริง (step, status_title, notes, image_url)
+    // 2. บันทึกลงตาราง log พร้อมรูปภาพ
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
        VALUES (?, ?, ?, ?, ?, NOW())`,
