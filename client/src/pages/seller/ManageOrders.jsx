@@ -9,9 +9,7 @@ import {
   Eye,
   Upload,
   X,
-  Sparkles,
-  AlertCircle,
-  CheckCircle2
+  Sparkles
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -24,32 +22,6 @@ const QUICK_STATUS_TAGS = [
   'สลักชื่อ / Customizing',
   'ตรวจสอบความประณีต (QC)',
   'จัดส่งพัสดุเรียบร้อยแล้ว'
-];
-
-export const ManageOrders = () => {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState(null);
-
-  // State สำหรับเก็บข้อความที่ผู้ขายพิมพ์แบบอิสระ
-  const [customTitle, setCustomTitle] = useState({});
-  const [customNote, setCustomNote] = useState({});
-  const [updateImageFile, setUpdateImageFile] = useState({});
-
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [previewImage, setPreviewImage] = useState(null);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/seller/orders');
-      if (res && res.data) {
-        const orderList = Array.isArray(res.data) ? res.data : (res.data.data || []);
-        setOrders(orderList);
-      }
-    } catch (err) {
-      console.warn('Fallback seller orders:', err.message);
-    } fiัดสั่งพัสดุเรียบร้อยแล้ว'
 ];
 
 export const ManageOrders = () => {
@@ -267,9 +239,8 @@ export const ManageOrders = () => {
             <option value="all">ALL ORDERS ({orders.length})</option>
             <option value="order_placed">รับคำสั่งซื้อ</option>
             <option value="material_prep">เตรียมวัตถุดิบ</option>
-            <option value="in_progress">กำลังรังสรรค์งาน</option>
+            <option value="crafting">กำลังประดิษฐ์</option>
             <option value="completed">เสร็จสมบูรณ์</option>
-            <option value="issue">แจ้งปัญหา</option>
           </select>
         </div>
       </div>
@@ -291,18 +262,13 @@ export const ManageOrders = () => {
             const currentCraftStatus = ord.craft_status || 'order_placed';
             const isCompleted = currentCraftStatus === 'completed';
 
-            // ดึงข้อความล่าสุดจาก Log เพื่อมาโชว์บนหัวการ์ด
-            const latestLog = ord.timeline && ord.timeline.length > 0 ? ord.timeline[ord.timeline.length - 1] : null;
-            const latestTitle = latestLog?.status_title || ord.notes || 'กำลังดำเนินการผลิต';
-
             return (
               <div
                 key={ord.id}
                 className="bg-white rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl border border-stone-200/80 hover:border-[#1B4332]/30 transition-all"
               >
-                {/* Header คำสั่งซื้อ + แถบข้อความสถานะล่าสุดจากผู้ซื้อ/ผู้ขาย */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-stone-200 gap-4">
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="font-mono text-sm font-extrabold text-[#1B4332] bg-[#FFE6A7]/40 px-3 py-1 rounded-full border border-[#FFE6A7]">
                         ORDER #{ord.id}
@@ -311,27 +277,6 @@ export const ManageOrders = () => {
                         STATUS: {currentCraftStatus}
                       </span>
                     </div>
-
-                    {/* 📌 แถบสถานะ/แจ้งปัญหาอัปเดตสดๆ บนหัวการ์ด */}
-                    <div className="pt-1">
-                      {currentCraftStatus === 'issue' || latestTitle.includes('แจ้งปัญหา') ? (
-                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-bold text-rose-800 flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                          <span><strong>การแจ้งเตือนปัญหาจากลูกค้า:</strong> {latestTitle}</span>
-                        </div>
-                      ) : isCompleted ? (
-                        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-bold text-emerald-900 flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span><strong>เสร็จสมบูรณ์:</strong> ผู้ซื้อได้รับสินค้าและยืนยันเรียบร้อยแล้ว</span>
-                        </div>
-                      ) : (
-                        <div className="p-3 bg-[#E8F7F3] border border-[#A2D9D2] rounded-2xl text-xs font-bold text-[#1B4332] flex items-center gap-2">
-                          <Sparkles className="w-4 h-4 text-[#E76F51] shrink-0" />
-                          <span><strong>อัปเดตความคืบหน้าล่าสุด:</strong> {latestTitle}</span>
-                        </div>
-                      )}
-                    </div>
-
                     <p className="text-xs text-stone-700 pt-1">
                       ผู้สั่งซื้อ: <strong className="font-bold text-stone-900">{ord.buyer_name || 'ลูกค้า'}</strong>
                     </p>
@@ -422,7 +367,7 @@ export const ManageOrders = () => {
                   ))}
                 </div>
 
-                {/* 🎨 Artisan Journal Control Panel */}
+                {/* 🎨 Artisan Journal Control Panel (อิสระ 100% ไร้ตัวเลขสเต็ปบังคับ) */}
                 <div className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] text-white p-6 rounded-2xl shadow-lg space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
                     <span className="text-xs font-mono font-bold tracking-widest uppercase text-[#FFE6A7] flex items-center gap-2">
@@ -437,7 +382,7 @@ export const ManageOrders = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* 1. หัวข้อสถานะ/กำลังทำอะไรอยู่ */}
+                      {/* 1. หัวข้อสถานะ/กำลังทำอะไรอยู่ (พิมพ์เองอิสระ + Quick Tags) */}
                       <div className="space-y-2">
                         <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
                           1. หัวข้อสถานะ / กำลังทำอะไรอยู่ (พิมพ์เองได้อิสระ)

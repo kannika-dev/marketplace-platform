@@ -27,26 +27,26 @@ export const Checkout = () => {
   // Accordion active step (1: Address, 2: Payment, 3: Review)
   const [currentStep, setCurrentStep] = useState(1);
 
-  // Form states (ดึงค่าเริ่มต้นมาจากข้อมูล user ในหน้า Profile อัตโนมัติ)
-  const [receiverName, setReceiverName] = useState(user?.name || '');
-  const [phoneNumber, setPhoneNumber] = useState(user?.phone || '');
-  const [addressNo, setAddressNo] = useState(user?.address_no || '');
-  const [subdistrict, setSubdistrict] = useState(user?.subdistrict || '');
-  const [district, setDistrict] = useState(user?.district || '');
-  const [province, setProvince] = useState(user?.province || '');
-  const [postalCode, setPostalCode] = useState(user?.zipcode || '');
+  // Form states (กำหนดค่าเริ่มต้นเป็นค่าว่างก่อน เพื่อรอข้อมูลจาก user)
+  const [receiverName, setReceiverName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [addressNo, setAddressNo] = useState('');
+  const [subdistrict, setSubdistrict] = useState('');
+  const [district, setDistrict] = useState('');
+  const [province, setProvince] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [note, setNote] = useState('');
 
-  // เมื่อข้อมูล user โหลดเสร็จ อัปเดต state ฟอร์มให้อัตโนมัติ
+  // เมื่อข้อมูล user โหลดเสร็จ ดึงข้อมูลมาเติมใส่อัตโนมัติ (และผู้ใช้สามารถพิมพ์แก้ได้อิสระ)
   useEffect(() => {
     if (user) {
-      if (!receiverName) setReceiverName(user.name || '');
-      if (!phoneNumber) setPhoneNumber(user.phone || '');
-      if (!addressNo) setAddressNo(user.address_no || '');
-      if (!subdistrict) setSubdistrict(user.subdistrict || '');
-      if (!district) setDistrict(user.district || '');
-      if (!province) setProvince(user.province || '');
-      if (!postalCode) setPostalCode(user.zipcode || '');
+      setReceiverName(user.name || user.full_name || '');
+      setPhoneNumber(user.phone || user.tel || '');
+      setAddressNo(user.address_no || user.address || '');
+      setSubdistrict(user.subdistrict || '');
+      setDistrict(user.district || '');
+      setProvince(user.province || '');
+      setPostalCode(user.zipcode || user.postal_code || '');
     }
   }, [user]);
 
@@ -97,7 +97,6 @@ export const Checkout = () => {
       // ประกอบร่างที่อยู่แบบละเอียดส่งเข้า Backend
       const fullAddressPayload = `${receiverName} (โทร: ${phoneNumber})\nบ้านเลขที่/ซอย: ${addressNo}\nตำบล/แขวง: ${subdistrict} อ.เภอ/เขต: ${district}\nจ. ${province} รหัสไปรษณีย์ ${postalCode}`;
 
-      // ปรับปรุง Payload ให้ปลอดภัย ป้องกันค่า undefined หรือ object ว่างชนฐานข้อมูล
       const orderPayload = {
         shipping_address: fullAddressPayload,
         note: `[การชำระเงิน: ${paymentType === 'deposit' ? 'มัดจำ 50%' : 'ชำระเต็มจำนวน'}] ${note}`,
@@ -158,7 +157,7 @@ export const Checkout = () => {
         {/* LEFT COLUMN: Modern 3-Step Visual Accordion (8 cols) */}
         <div className="lg:col-span-8 space-y-5">
 
-          {/* STEP 1: Shipping Address (Auto-filled from Profile) */}
+          {/* STEP 1: Shipping Address (Auto-filled & Editable) */}
           <div className={`clay-card rounded-3xl border transition-all overflow-hidden ${currentStep === 1 ? 'border-[#2A9D8F] ring-2 ring-[#2A9D8F]/20' : 'border-white'}`}>
             <button
               type="button"
@@ -185,7 +184,7 @@ export const Checkout = () => {
               <div className="p-6 sm:p-8 pt-2 border-t border-emerald-100/60 space-y-4 bg-white/40">
                 <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-[11px] text-[#1B4332] flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-[#2A9D8F] shrink-0" />
-                  <span>ระบบดึงข้อมูลที่อยู่จากหน้าโปรไฟล์ของคุณมาเป็นค่าเริ่มต้นให้เรียบร้อย สามารถพิมพ์ปรับเปลี่ยนได้เฉพาะออเดอร์นี้ค่ะ</span>
+                  <span>ระบบดึงข้อมูลที่อยู่จากหน้าโปรไฟล์มาเป็นค่าเริ่มต้นให้แล้ว สามารถพิมพ์แก้ไขเฉพาะออเดอร์นี้ได้ทันทีค่ะ</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
