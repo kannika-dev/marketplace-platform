@@ -255,7 +255,7 @@ export const upgradeToSeller = async (req, res) => {
 export const getProfile = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, name, email, role, store_name, bank_account, phone, address_no, subdistrict, district, province, zipcode, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, role, store_name, bank_account, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
 
