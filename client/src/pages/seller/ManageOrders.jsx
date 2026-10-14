@@ -1,29 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
-import Badge from '../../components/common/Badge';
 import {
   Hammer,
-  Truck,
-  CheckCircle2,
-  Clock,
-  Sparkles,
-  ArrowRight,
-  Filter,
   ArrowLeft,
   Send,
   PackageOpen,
   SlidersHorizontal,
-  ChevronRight,
   Eye,
   Upload,
   X,
   Image as ImageIcon,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle2,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const STATUS_OPTIONS = [
+const STATUS_ORDER = [
   { value: 'pending_approval', label: '00 // รอร้านค้าอนุมัติคิวงาน (Pending Approval)' },
   { value: 'order_placed', label: '01 // รับคำสั่งซื้อ/รอชำระเงิน (Order Placed)' },
   { value: 'material_prep', label: '02 // จัดเตรียมวัตถุดิบ (Material Prep)' },
@@ -38,7 +33,6 @@ export const ManageOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
-  const [selectedStatus, setSelectedStatus] = useState({});
   const [customNote, setCustomNote] = useState({});
   const [updateImageFile, setUpdateImageFile] = useState({});
   const [filterStatus, setFilterStatus] = useState('all');
@@ -63,21 +57,29 @@ export const ManageOrders = () => {
     fetchOrders();
   }, []);
 
-  // ฟังก์ชันอัปเดตสเต็ปงานคราฟต์ & แนบรูปภาพความคืบหน้า
-  const handleUpdateStatus = async (orderId) => {
-    const targetOrder = orders.find(o => o.id === orderId);
-    const newStatus = selectedStatus[orderId] || targetOrder?.craft_status || 'material_prep';
+  // คำนวณหาขั้นตอนถัดไปอัตโนมัติ
+  const getNextStageInfo = (currentCraftStatus) => {
+    const currentIndex = STATUS_ORDER.findIndex(s => s.value === currentCraftStatus);
+    if (currentIndex !== -1 && currentIndex < STATUS_ORDER.length - 1) {
+      return STATUS_ORDER[currentIndex + 1];
+    }
+    // กรณีที่หาไม่เจอ หรืออยู่ที่สเต็ปเริ่มต้น/จบแล้ว
+    if (currentCraftStatus === 'completed') {
+      return STATUS_ORDER[STATUS_ORDER.length - 1];
+    }
+    return STATUS_ORDER[2]; // Default to material_prep (02)
+  };
 
+  // ฟังก์ชันกดปุ่ม "ดำเนินการขั้นตอนถัดไป"
+  const handleAdvanceNextStage = async (orderId, targetNextStage) => {
     setUpdatingId(orderId);
     try {
       const note = customNote[orderId] || '';
-      const matched = STATUS_OPTIONS.find((s) => s.value === newStatus);
-      const stepTitleToSend = matched?.label || newStatus;
       const imageFile = updateImageFile[orderId];
 
       const formData = new FormData();
-      formData.append('craft_status', newStatus);
-      formData.append('step_title', stepTitleToSend);
+      formData.append('craft_status', targetNextStage.value);
+      formData.append('step_title', targetNextStage.label);
       formData.append('note', note);
 
       if (imageFile) {
@@ -88,12 +90,12 @@ export const ManageOrders = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert('✨ อัปเดตสถานะงานคราฟต์สำเร็จ! ส่งข้อมูลและรูปภาพถึงผู้ซื้อเรียบร้อยแล้ว');
+      alert(`✨ อัปเดตไปยังขั้นตอน "${targetNextStage.label}" เรียบร้อยแล้ว!`);
       setUpdateImageFile({ ...updateImageFile, [orderId]: null });
       setCustomNote({ ...customNote, [orderId]: '' });
       fetchOrders();
     } catch (err) {
-      console.error('Update craft status error:', err);
+      console.error('Advance stage error:', err);
       alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอัปเดตสถานะ กรุณาลองใหม่อีกครั้ง');
     } finally {
       setUpdatingId(null);
@@ -254,7 +256,7 @@ export const ManageOrders = () => {
             className="text-xs font-mono font-bold py-2 px-3 bg-white border border-stone-200 rounded-xl focus:outline-none focus:border-[#1B4332] text-stone-800"
           >
             <option value="all">ALL STAGES ({orders.length})</option>
-            {STATUS_OPTIONS.map((st) => (
+            {STATUS_ORDER.map((st) => (
               <option key={st.value} value={st.value}>
                 {st.label}
               </option>
@@ -281,6 +283,10 @@ export const ManageOrders = () => {
             const isPaymentVerified = ord.payment_status === 'paid' || ord.status === 'paid' || ord.status === 'completed' || (ord.craft_status && ord.craft_status !== 'order_placed' && ord.craft_status !== 'pending_approval');
             const isSlipRejected = ord.payment_status === 'rejected';
 
+            const currentCraftStatus = ord.craft_status || 'order_placed';
+            const nextStage = getNextStageInfo(currentCraftStatus);
+            const isCompleted = currentCraftStatus === 'completed';
+
             return (
               <div
                 key={ord.id}
@@ -294,7 +300,7 @@ export const ManageOrders = () => {
                         ORDER #{ord.id}
                       </span>
                       <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold border border-emerald-200">
-                        🛠️ STAGE: {ord.craft_status || ord.status}
+                        🛠️ STAGE: {currentCraftStatus}
                       </span>
                       {isPendingApproval ? (
                         <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full font-bold border bg-amber-50 text-amber-800 border-amber-200">
@@ -446,7 +452,7 @@ export const ManageOrders = () => {
                   ))}
                 </div>
 
-                {/* Crafting Journey Control Panel */}
+                {/* 🚀 Crafting Journey Control Panel (Smart Advance UI) */}
                 <div className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] text-white p-6 rounded-2xl shadow-lg space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
                     <span className="text-xs font-mono font-bold tracking-widest uppercase text-[#FFE6A7] flex items-center gap-2">
@@ -454,72 +460,71 @@ export const ManageOrders = () => {
                       <span>CRAFTING JOURNEY STAGE CONTROL</span>
                     </span>
                     <span className="text-xs text-stone-200 font-mono">
-                      CURRENT STAGE: <strong className="text-[#FFE6A7] uppercase font-bold">{ord.craft_status || ord.status}</strong>
+                      CURRENT STAGE: <strong className="text-[#FFE6A7] uppercase font-bold">{currentCraftStatus}</strong>
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                    <div className="md:col-span-4 space-y-1.5">
-                      <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
-                        SELECT NEXT STAGE // เลือกขั้นตอน
-                      </label>
-                      <select
-                        value={selectedStatus[ord.id] !== undefined ? selectedStatus[ord.id] : (ord.craft_status || 'material_prep')}
-                        disabled={updatingId === ord.id}
-                        onChange={(e) => setSelectedStatus({ ...selectedStatus, [ord.id]: e.target.value })}
-                        className="w-full text-xs font-medium p-3 bg-white text-stone-900 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE6A7] shadow-inner"
-                      >
-                        {STATUS_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
+                  {isCompleted ? (
+                    <div className="bg-white/10 p-4 rounded-xl text-center space-y-1">
+                      <p className="text-sm font-bold text-[#FFE6A7] flex items-center justify-center gap-1.5">
+                        <CheckCircle className="w-4 h-4 text-emerald-400" /> คำสั่งซื้อนี้เสร็จสมบูรณ์เรียบร้อยแล้ว
+                      </p>
+                      <p className="text-xs text-stone-300 font-mono">This order has reached its final completed stage.</p>
                     </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Inputs Zone */}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                        <div className="md:col-span-8 space-y-1.5">
+                          <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
+                            JOURNAL NOTE // ข้อความถึงลูกค้า (ไม่บังคับ)
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="เช่น กำลังตากชิ้นงานให้แห้งสนิทก่อนลงเตาเผา..."
+                            value={customNote[ord.id] || ''}
+                            onChange={(e) => setCustomNote({ ...customNote, [ord.id]: e.target.value })}
+                            className="w-full text-xs p-3 bg-white text-stone-900 placeholder:text-stone-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE6A7]"
+                          />
+                        </div>
 
-                    <div className="md:col-span-4 space-y-1.5">
-                      <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
-                        JOURNAL NOTE // ข้อความถึงลูกค้า (ไม่บังคับ)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="เช่น กำลังพักชิ้นงานให้แห้งสนิทก่อนลงเตาเผา..."
-                        value={customNote[ord.id] || ''}
-                        onChange={(e) => setCustomNote({ ...customNote, [ord.id]: e.target.value })}
-                        className="w-full text-xs p-3 bg-white text-stone-900 placeholder:text-stone-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FFE6A7]"
-                      />
-                    </div>
+                        <div className="md:col-span-4 space-y-1.5">
+                          <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
+                            ATTACH PHOTO // แนบรูปงาน (ไม่บังคับ)
+                          </label>
+                          <label className="w-full py-3 px-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 cursor-pointer truncate">
+                            <Upload className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">
+                              {updateImageFile[ord.id] ? updateImageFile[ord.id].name : 'เลือกรูปภาพความคืบหน้า'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => setUpdateImageFile({ ...updateImageFile, [ord.id]: e.target.files[0] })}
+                            />
+                          </label>
+                        </div>
+                      </div>
 
-                    <div className="md:col-span-2 space-y-1.5">
-                      <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
-                        ATTACH PHOTO // แนบรูปงาน (ไม่บังคับ)
-                      </label>
-                      <label className="w-full py-3 px-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 cursor-pointer truncate">
-                        <Upload className="w-3.5 h-3.5 shrink-0" />
-                        <span className="truncate">
-                          {updateImageFile[ord.id] ? updateImageFile[ord.id].name : 'เลือกรูปภาพ'}
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => setUpdateImageFile({ ...updateImageFile, [ord.id]: e.target.files[0] })}
-                        />
-                      </label>
+                      {/* Single Big Advance Action Button */}
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          disabled={updatingId === ord.id}
+                          onClick={() => handleAdvanceNextStage(ord.id, nextStage)}
+                          className="w-full py-3.5 px-6 rounded-xl text-xs font-bold uppercase tracking-wider shadow-xl bg-gradient-to-r from-[#E76F51] to-[#f4a261] hover:from-[#d95d3f] hover:to-[#e76f51] text-white flex items-center justify-center gap-2.5 transition-all transform active:scale-[0.99] disabled:opacity-50 cursor-pointer"
+                        >
+                          <Send className="w-4 h-4 shrink-0" />
+                          <span>
+                            {updatingId === ord.id
+                              ? 'กำลังบันทึกสเต็ปถัดไป...'
+                              : `ดำเนินการขั้นตอนถัดไป ➔ [ ${nextStage.label} ]`}
+                          </span>
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="md:col-span-2">
-                      <button
-                        type="button"
-                        disabled={updatingId === ord.id}
-                        onClick={() => handleUpdateStatus(ord.id)}
-                        className="btn-runway-terracotta w-full py-3 px-4 rounded-xl text-xs font-bold uppercase tracking-wider shadow-md flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                        <span>{updatingId === ord.id ? 'SAVING...' : 'UPDATE'}</span>
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
               </div>
