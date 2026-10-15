@@ -35,74 +35,13 @@ export const Products = () => {
   const fetchProductsList = async () => {
     setLoading(true);
     try {
-      const res = await getProducts(filters);
-      if (res && res.data) {
-        setProducts(res.data);
-      }
+      // ดึงสินค้าทั้งหมดจาก API มาก่อน เพื่อให้มั่นใจว่าข้อมูลไม่หาย
+      const res = await getProducts();
+      const items = res.data || res || [];
+      setProducts(items);
     } catch (err) {
-      console.warn('API error, providing fallback catalogue:', err.message);
-      setProducts([
-        {
-          id: 1,
-          title: 'แจกันดินเผาเคลือบขี้เถ้าธรรมชาติ (Ash Glazed Ceramic Vase)',
-          category: 'Ceramics',
-          price: 1850,
-          is_made_to_order: 1,
-          lead_time_days: 7,
-          shop_name: 'เตาเผาดอยสะเก็ด',
-          image_url: 'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?auto=format&fit=crop&w=700&q=80'
-        },
-        {
-          id: 2,
-          title: 'กระเป๋าหนังฟอกฝาดเย็บมืออิตาเลียน (Vegetable Tanned Leather Tote)',
-          category: 'Leather',
-          price: 3490,
-          is_made_to_order: 1,
-          lead_time_days: 5,
-          shop_name: 'Studio Tannery',
-          image_url: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=700&q=80'
-        },
-        {
-          id: 3,
-          title: 'ชามไม้สักทองกลึงมือลายเกรนธรรมชาติ (Hand-turned Teak Wood Bowl)',
-          category: 'Woodcraft',
-          price: 1200,
-          is_made_to_order: 0,
-          lead_time_days: 2,
-          shop_name: 'ช่างไม้แพร่สตูดิโอ',
-          image_url: 'https://images.unsplash.com/photo-1605371924599-2d0365da1ae0?auto=format&fit=crop&w=700&q=80'
-        },
-        {
-          id: 4,
-          title: 'ผ้าคลุมไหล่ย้อมครามลายสายหมอก (Handwoven Indigo Dye Scarf)',
-          category: 'Textiles',
-          price: 950,
-          is_made_to_order: 0,
-          lead_time_days: 3,
-          shop_name: 'บ้านครามสกล',
-          image_url: 'https://images.unsplash.com/photo-1606760227091-3dd870d97f1d?auto=format&fit=crop&w=700&q=80'
-        },
-        {
-          id: 5,
-          title: 'ชุดถ้วยชาเซรามิกเคลือบเทนโมกุ (Tenmoku Teacup Set)',
-          category: 'Ceramics',
-          price: 1450,
-          is_made_to_order: 1,
-          lead_time_days: 6,
-          shop_name: 'เตาเผาดอยสะเก็ด',
-          image_url: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=700&q=80'
-        },
-        {
-          id: 6,
-          title: 'ต่างหูเงินแท้ทำมือรูปทรงอินทรีย์ (Organic Silver Earrings)',
-          category: 'Jewelry',
-          price: 1650,
-          is_made_to_order: 1,
-          lead_time_days: 4,
-          shop_name: 'Silversmith Nan',
-          image_url: 'https://images.unsplash.com/photo-1630019852942-f89202989a59?auto=format&fit=crop&w=700&q=80'
-        }
-      ]);
+      console.warn('API error:', err.message);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -110,20 +49,52 @@ export const Products = () => {
 
   useEffect(() => {
     fetchProductsList();
-  }, [filters.category, filters.search, filters.is_made_to_order, filters.min_price, filters.max_price]);
+  }, []);
 
-  // Client-side sorting fallback for immediate UI feedback
-  const sortedProducts = useMemo(() => {
-    const list = [...products];
+  // ระบบกรองและเรียงลำดับสินค้าฝั่งหน้าเว็บ (Client-side Filtering & Sorting) เพื่อความแม่นยำ 100% ทุกปุ่มทุกเมนู
+  const filteredAndSortedProducts = useMemo(() => {
+    let list = [...products];
+
+    // 1. กรองตามหมวดหมู่ (Category)
+    if (filters.category && filters.category !== 'all') {
+      list = list.filter((p) => {
+        const catStr = String(p.category_id || p.category || '');
+        return catStr.toLowerCase().includes(filters.category.toLowerCase());
+      });
+    }
+
+    // 2. กรองตามประเภท Handmade (0) หรือ Craft Studio / Made-to-order (1)
+    if (filters.is_made_to_order !== '') {
+      const targetVal = String(filters.is_made_to_order) === 'true' || String(filters.is_made_to_order) === '1' ? 1 : 0;
+      list = list.filter((p) => Number(p.is_made_to_order) === targetVal);
+    }
+
+    // 3. กรองตามคำค้นหา (Search)
+    if (filters.search) {
+      const keyword = filters.search.toLowerCase();
+      list = list.filter((p) =>
+        (p.title && p.title.toLowerCase().includes(keyword)) ||
+        (p.description && p.description.toLowerCase().includes(keyword))
+      );
+    }
+
+    // 4. กรองตามช่วงราคา (Price Range)
+    if (filters.min_price !== '') {
+      list = list.filter((p) => Number(p.price) >= Number(filters.min_price));
+    }
+    if (filters.max_price !== '') {
+      list = list.filter((p) => Number(p.price) <= Number(filters.max_price));
+    }
+
+    // 5. จัดเรียงสินค้า (Sorting)
     if (filters.sort === 'price_asc') {
       return list.sort((a, b) => Number(a.price) - Number(b.price));
     }
     if (filters.sort === 'price_desc') {
       return list.sort((a, b) => Number(b.price) - Number(a.price));
     }
-    // newest / default
     return list.sort((a, b) => (b.id || 0) - (a.id || 0));
-  }, [products, filters.sort]);
+  }, [products, filters]);
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -196,9 +167,9 @@ export const Products = () => {
                 <div key={i} className="runway-card rounded-3xl h-96 animate-pulse bg-stone-100" />
               ))}
             </div>
-          ) : sortedProducts.length > 0 ? (
+          ) : filteredAndSortedProducts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
-              {sortedProducts.map((product) => (
+              {filteredAndSortedProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
