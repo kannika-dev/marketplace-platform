@@ -320,9 +320,10 @@ export const ManageOrders = () => {
 
             const isPendingApproval = currentCraftStatus === 'order_placed' || ord.status === 'pending' || ord.status === 'pending_approval';
             const hasUploadedSlip = Boolean(ord.payment_slip_url);
+            const hasUploadedFinalSlip = Boolean(ord.final_payment_slip_url);
 
             const isAwaitingFinalPayment = currentCraftStatus === 'awaiting_final_payment';
-            const isFinalPaymentVerification = currentCraftStatus === 'final_payment_verification';
+            const isFinalPaymentVerification = hasUploadedFinalSlip && currentCraftStatus !== 'ready_to_ship' && currentCraftStatus !== 'completed';
             const isCompleted = currentCraftStatus === 'completed';
 
             const depositAmt = Number(ord.deposit_amount || Math.round(ord.total_amount * 0.5));
@@ -365,110 +366,141 @@ export const ManageOrders = () => {
                   </div>
                 </div>
 
-                {/* แผงควบคุมการอนุมัติและสลิป */}
-                <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    {ord.payment_slip_url ? (
-                      <div
-                        onClick={() => setPreviewImage(ord.payment_slip_url)}
-                        className="relative w-16 h-16 rounded-xl overflow-hidden border border-stone-300 shrink-0 cursor-pointer group shadow-sm bg-white"
-                      >
-                        <img src={ord.payment_slip_url} alt="สลิปโอนเงิน" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                          <Eye className="w-4 h-4" />
+                {/* 📌 แผงควบคุมการอนุมัติและสลิป (แยก 2 กล่องชัดเจนระหว่างงวด 1 และงวด 2) */}
+                <div className="space-y-4">
+
+                  {/* กล่องที่ 1: สลิปมัดจำ / งวดแรก */}
+                  <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      {ord.payment_slip_url ? (
+                        <div
+                          onClick={() => setPreviewImage(ord.payment_slip_url)}
+                          className="relative w-16 h-16 rounded-xl overflow-hidden border border-stone-300 shrink-0 cursor-pointer group shadow-sm bg-white"
+                        >
+                          <img src={ord.payment_slip_url} alt="สลิปมัดจำ" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <Eye className="w-4 h-4" />
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="w-16 h-16 rounded-xl bg-stone-200 flex items-center justify-center text-stone-400 text-[10px] font-mono shrink-0">
-                        {hasUploadedSlip ? 'มีสลิป' : 'รอสลิป'}
-                      </div>
-                    )}
-                    <div>
-                      <span className="font-bold text-xs text-stone-900 block">หลักฐานการโอนเงิน &amp; ปุ่มดำเนินการ</span>
-                      <span className="text-[11px] text-stone-500">
-                        {isPendingApproval
-                          ? 'คำสั่งซื้อใหม่ รอคุณกดอนุมัติเพื่อเปิดรับชำระเงิน'
-                          : isFinalPaymentVerification
-                            ? '🎉 ลูกค้าแนบสลิปงวดสุดท้ายแล้ว กรุณาตรวจสอบ'
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl bg-stone-200 flex items-center justify-center text-stone-400 text-[10px] font-mono shrink-0">
+                          {hasUploadedSlip ? 'มีสลิป' : 'รอสลิปงวด 1'}
+                        </div>
+                      )}
+                      <div>
+                        <span className="font-bold text-xs text-stone-900 block">หลักฐานสลิปมัดจำ (งวดที่ 1)</span>
+                        <span className="text-[11px] text-stone-500">
+                          {isPendingApproval
+                            ? 'รออนุมัติคำสั่งซื้อก่อน'
                             : hasUploadedSlip
-                              ? 'ลูกค้าแนบสลิปแล้ว กรุณาตรวจสอบยอดเงิน'
-                              : 'รอผู้ซื้อโอนเงินและแนบสลิป'}
-                      </span>
+                              ? 'ลูกค้าแนบสลิปมัดจำแล้ว กรุณาตรวจสอบ'
+                              : 'รอผู้ซื้อโอนเงินมัดจำ'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                      {isPendingApproval && (
+                        <button
+                          type="button"
+                          disabled={updatingId === ord.id}
+                          onClick={() => handleApproveOrder(ord.id)}
+                          className="px-4 py-2.5 bg-[#2A9D8F] hover:bg-[#21867a] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>✅ อนุมัติรับคำสั่งซื้อ</span>
+                        </button>
+                      )}
+
+                      {hasUploadedSlip && currentCraftStatus === 'awaiting_deposit' && (
+                        <>
+                          <button
+                            type="button"
+                            disabled={updatingId === ord.id}
+                            onClick={() => handleApprovePayment(ord.id)}
+                            className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            ✅ ยืนยันสลิปมัดจำถูกต้อง
+                          </button>
+                          <button
+                            type="button"
+                            disabled={updatingId === ord.id}
+                            onClick={() => handleRejectSlip(ord.id)}
+                            className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            ❌ สลิปไม่ถูกต้อง
+                          </button>
+                        </>
+                      )}
+
+                      {isDeposit && (currentCraftStatus === 'in_progress' || currentCraftStatus === 'production_finished') && (
+                        <button
+                          type="button"
+                          disabled={updatingId === ord.id}
+                          onClick={() => handleRequestFinalPayment(ord.id, remainingAmt)}
+                          className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                          <span>🔔 แจ้งชำระเงินงวดที่ 2 (฿{remainingAmt.toLocaleString()})</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {/* 🔘 ปุ่มควบคุมฝั่งผู้ขาย */}
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    {/* 1. ปุ่มอนุมัติรับคำสั่งซื้อ */}
-                    {isPendingApproval && (
-                      <button
-                        type="button"
-                        disabled={updatingId === ord.id}
-                        onClick={() => handleApproveOrder(ord.id)}
-                        className="px-4 py-2.5 bg-[#2A9D8F] hover:bg-[#21867a] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>✅ อนุมัติรับคำสั่งซื้อ</span>
-                      </button>
-                    )}
+                  {/* กล่องที่ 2: สลิปยอดคงเหลือ / งวดที่ 2 (แสดงเฉพาะออเดอร์แบบมัดจำเมื่อมีการเรียกเก็บเงินแล้ว) */}
+                  {isDeposit && (isAwaitingFinalPayment || hasUploadedFinalSlip || currentCraftStatus === 'ready_to_ship' || isCompleted) && (
+                    <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        {ord.final_payment_slip_url ? (
+                          <div
+                            onClick={() => setPreviewImage(ord.final_payment_slip_url)}
+                            className="relative w-16 h-16 rounded-xl overflow-hidden border border-amber-300 shrink-0 cursor-pointer group shadow-sm bg-white"
+                          >
+                            <img src={ord.final_payment_slip_url} alt="สลิปงวดที่ 2" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                              <Eye className="w-4 h-4" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 rounded-xl bg-amber-200/60 flex items-center justify-center text-amber-700 text-[10px] font-mono shrink-0">
+                            รอสลิปงวด 2
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-bold text-xs text-amber-900 block">หลักฐานสลิปยอดคงเหลือ (งวดที่ 2) - ฿{remainingAmt.toLocaleString()}</span>
+                          <span className="text-[11px] text-amber-700">
+                            {hasUploadedFinalSlip
+                              ? '🎉 ลูกค้าแนบสลิปงวดที่ 2 แล้ว กรุณาตรวจสอบ'
+                              : 'ส่งแจ้งเตือนให้ลูกค้าชำระเงินงวดที่ 2 แล้ว รอหลักฐานโอนเงิน'}
+                          </span>
+                        </div>
+                      </div>
 
-                    {/* 2. ปุ่มตรวจสลิปงวดแรก */}
-                    {hasUploadedSlip && currentCraftStatus === 'awaiting_deposit' && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={updatingId === ord.id}
-                          onClick={() => handleApprovePayment(ord.id)}
-                          className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
-                        >
-                          ✅ ยืนยันสลิปมัดจำถูกต้อง
-                        </button>
-                        <button
-                          type="button"
-                          disabled={updatingId === ord.id}
-                          onClick={() => handleRejectSlip(ord.id)}
-                          className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
-                        >
-                          ❌ สลิปไม่ถูกต้อง
-                        </button>
-                      </>
-                    )}
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        {isFinalPaymentVerification && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={updatingId === ord.id}
+                              onClick={() => handleApproveFinalPayment(ord.id)}
+                              className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              ✅ ยืนยันสลิปรอบ 2 ถูกต้อง (พร้อมจัดส่ง)
+                            </button>
+                            <button
+                              type="button"
+                              disabled={updatingId === ord.id}
+                              onClick={() => handleRejectSlip(ord.id)}
+                              className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              ❌ สลิปไม่ถูกต้อง
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                    {/* 3. ปุ่มกดเรียกเก็บเงินงวดที่ 2 (สำหรับงานมัดจำที่ทำเสร็จแล้ว) */}
-                    {isDeposit && (currentCraftStatus === 'in_progress' || currentCraftStatus === 'production_finished') && (
-                      <button
-                        type="button"
-                        disabled={updatingId === ord.id}
-                        onClick={() => handleRequestFinalPayment(ord.id, remainingAmt)}
-                        className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        <span>🔔 แจ้งชำระเงินงวดที่ 2 (฿{remainingAmt.toLocaleString()})</span>
-                      </button>
-                    )}
-
-                    {/* 4. ปุ่มตรวจสลิปงวดที่ 2 (งวดสุดท้าย) */}
-                    {isFinalPaymentVerification && (
-                      <>
-                        <button
-                          type="button"
-                          disabled={updatingId === ord.id}
-                          onClick={() => handleApproveFinalPayment(ord.id)}
-                          className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
-                        >
-                          ✅ ยืนยันสลิปรอบ 2 ถูกต้อง (พร้อมจัดส่ง)
-                        </button>
-                        <button
-                          type="button"
-                          disabled={updatingId === ord.id}
-                          onClick={() => handleRejectSlip(ord.id)}
-                          className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
-                        >
-                          ❌ สลิปไม่ถูกต้อง
-                        </button>
-                      </>
-                    )}
-                  </div>
                 </div>
 
                 {/* รายการสินค้า */}
