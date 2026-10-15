@@ -77,7 +77,7 @@ export const ProductDetail = () => {
         const targetSellerId = productData?.seller_id || productData?.shop_id;
         if (targetSellerId) {
           try {
-            const shopRes = await fetch(`http://localhost:5000/api/shops/seller/${targetSellerId}`);
+            const shopRes = await fetch(`https://marketplace-platform-xh1q.onrender.com/api/shops/seller/${targetSellerId}`);
             const shopData = await shopRes.json();
             if (shopData.success && shopData.shop) {
               setShopInfo(shopData.shop);
@@ -188,9 +188,9 @@ export const ProductDetail = () => {
             )}
           </div>
 
-          {/* Artisan Atelier Spotlight Card */}
+          {/* Artisan Atelier Spotlight Card - พาไปหน้าร้านค้าสาธารณะที่มีสินค้าทั้งหมดของร้าน */}
           <Link
-            to={`/seller/${sellerId}`}
+            to={`/shop/${sellerId}`}
             className="p-6 rounded-3xl bg-white border border-stone-200/80 shadow-xs hover:border-[#1B4332] hover:shadow-md cursor-pointer transition-all flex items-start gap-4 group block"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#1B4332] text-[#FFE6A7] flex items-center justify-center shrink-0 font-display font-bold text-xl shadow-md group-hover:scale-105 transition-transform overflow-hidden">

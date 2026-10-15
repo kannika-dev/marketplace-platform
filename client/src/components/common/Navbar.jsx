@@ -11,21 +11,10 @@ import {
   Menu,
   X,
   LogOut,
-  ArrowRight,
   Store,
   PackageOpen
 } from 'lucide-react';
 import Badge from './Badge';
-
-// Quick-Filter Category Bar data
-const QUICK_CATEGORIES = [
-  { emoji: '🧶', label: 'งานเย็บปักถักร้อย', id: 'Textiles' },
-  { emoji: '🕯️', label: 'เทียนหอม & สกินแคร์', id: 'Candles' },
-  { emoji: '🍵', label: 'เซรามิก & งานปั้น', id: 'Ceramics' },
-  { emoji: '👜', label: 'เครื่องหนังทำมือ', id: 'Leather' },
-  { emoji: '🪵', label: 'งานไม้ & Craft', id: 'Woodcraft' },
-  { emoji: '💍', label: 'เครื่องประดับ Handmade', id: 'Jewelry' },
-];
 
 export const Navbar = () => {
   const { user, role, logout, cart, upgradeToSeller } = useAuth();
@@ -97,7 +86,7 @@ export const Navbar = () => {
           </Link>
 
           {/* Navigation Links (Desktop) */}
-          <nav className="hidden md:flex items-center gap-5 text-xs font-bold uppercase tracking-wider text-stone-700">
+          <nav className="hidden md:flex items-center gap-6 text-xs font-bold uppercase tracking-wider text-stone-700">
             <Link
               to="/"
               className="hover:text-[#E76F51] transition-colors py-1 relative after:absolute after:bottom-0 after:left-0 after:w-0 hover:after:w-full after:h-0.5 after:bg-[#E76F51] after:transition-all"
@@ -254,33 +243,6 @@ export const Navbar = () => {
         </div>
       </div>
 
-      {/* ── CATEGORY QUICK-FILTER BAR (Desktop) ── */}
-      <div className="hidden md:block border-t border-stone-100 bg-white/80 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-1 py-2 overflow-x-auto scrollbar-none">
-            <span className="text-[9px] font-mono font-bold uppercase tracking-widest text-stone-400 shrink-0 pr-2 border-r border-stone-200 mr-2">
-              หมวดหมู่
-            </span>
-            {QUICK_CATEGORIES.map((cat) => (
-              <Link
-                key={cat.id}
-                to={`/products?category=${cat.id}`}
-                className="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-medium text-stone-600 hover:bg-[#1B4332] hover:text-white transition-all border border-transparent hover:border-[#1B4332] whitespace-nowrap"
-              >
-                <span>{cat.emoji}</span>
-                <span>{cat.label}</span>
-              </Link>
-            ))}
-            <Link
-              to="/products"
-              className="shrink-0 ml-auto flex items-center gap-1 text-[11px] font-bold text-[#E76F51] hover:text-[#D95D3F] transition-colors whitespace-nowrap pl-4"
-            >
-              ดูทั้งหมด <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="md:hidden bg-[#FAF9F5] border-b border-stone-200 px-5 pt-3 pb-6 space-y-3">
@@ -296,7 +258,7 @@ export const Navbar = () => {
             onClick={() => setMobileMenuOpen(false)}
             className="block py-2 text-sm font-bold uppercase tracking-wider text-stone-800"
           >
-            Handmade Lookbook
+            Marketplace
           </Link>
 
           {user && (
@@ -308,24 +270,6 @@ export const Navbar = () => {
               🛍️ แดชบอร์ดผู้ซื้อ
             </Link>
           )}
-
-          {/* Mobile Category Quick-Filter */}
-          <div className="pt-2 border-t border-stone-200 space-y-1">
-            <span className="text-[10px] uppercase text-[#E76F51] font-mono font-bold tracking-widest block mb-2">หมวดหมู่ Handmade & Craft</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              {QUICK_CATEGORIES.map((cat) => (
-                <Link
-                  key={cat.id}
-                  to={`/products?category=${cat.id}`}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-stone-700 bg-white border border-stone-200 hover:border-[#1B4332] hover:text-[#1B4332] transition-all"
-                >
-                  <span>{cat.emoji}</span>
-                  <span className="truncate">{cat.label}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
 
           {user && (
             <Link

@@ -1,39 +1,39 @@
 import React from 'react';
-import { Search, Filter, RotateCcw, Sparkles, Package, Heart, Hammer } from 'lucide-react';
+import { Search, Filter, RotateCcw, Heart, Hammer } from 'lucide-react';
 
 const CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด (All)', emoji: '🎨' },
-  { id: 'เซรามิก', label: 'เซรามิก & งานปั้น Craft', emoji: '🍵' },
-  { id: 'งานไม้', label: 'งานไม้ & Craft ทำมือ', emoji: '🪵' },
-  { id: 'เครื่องหนัง', label: 'เครื่องหนัง Handmade', emoji: '👜' },
-  { id: 'งานเย็บปัก', label: 'งานเย็บปักถักร้อย', emoji: '🧶' },
-  { id: 'เครื่องประดับ', label: 'เครื่องประดับ Handmade', emoji: '💍' },
-  { id: 'เทียนหอม', label: 'เทียนหอม & สกินแคร์', emoji: '🕯️' },
-  { id: 'ของแต่งบ้าน', label: 'ของแต่งบ้าน Handmade', emoji: '🏺' },
+  { id: '3', label: 'เซรามิก & งานปั้น Craft', emoji: '🍵' },
+  { id: '4', label: 'งานไม้ & Craft ทำมือ', emoji: '🪵' },
+  { id: '5', label: 'เครื่องหนัง Handmade', emoji: '👜' },
+  { id: '6', label: 'งานเย็บปักถักร้อย', emoji: '🧶' },
+  { id: '7', label: 'เครื่องประดับ Handmade', emoji: '💍' },
+  { id: '8', label: 'เทียนหอม & สกินแคร์', emoji: '🕯️' },
+  { id: '9', label: 'ของแต่งบ้าน Handmade', emoji: '🏺' },
 ];
 
 export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
   return (
-    <div className="runway-card p-6 rounded-3xl space-y-6 bg-white border border-stone-200/80">
-
-      {/* Header */}
-      <div className="flex items-center justify-between pb-3.5 border-b border-stone-200">
+    <div className="runway-card p-6 rounded-3xl space-y-6 bg-white border border-stone-200/80 shadow-xs">
+      {/* Header & Reset */}
+      <div className="flex items-center justify-between pb-4 border-b border-stone-200">
         <div className="flex items-center gap-2 text-stone-900 font-mono font-bold text-xs uppercase tracking-wider">
-          <Filter className="w-3.5 h-3.5 text-[#E76F51]" />
-          <span>กรองงาน Handmade &amp; Craft</span>
+          <Filter className="w-4 h-4 text-[#E76F51]" />
+          <span>ตัวกรองสินค้าทั้งหมด</span>
         </div>
         <button
+          type="button"
           onClick={onReset}
           className="text-xs text-stone-400 hover:text-[#E76F51] flex items-center gap-1 transition-colors font-mono uppercase"
         >
-          <RotateCcw className="w-3 h-3" /> RESET
+          <RotateCcw className="w-3 h-3" /> ล้างตัวกรอง
         </button>
       </div>
 
-      {/* Search */}
+      {/* Search Input */}
       <div>
         <label className="text-[11px] font-mono font-bold text-stone-500 uppercase tracking-wider block mb-2">
-          ค้นหางาน Handmade &amp; Craft
+          ค้นหาผลงานคราฟต์
         </label>
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-stone-400" />
@@ -47,17 +47,17 @@ export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
         </div>
       </div>
 
-      {/* ── HANDMADE vs CRAFT STUDIO FILTER ── */}
+      {/* Production Type (Handmade vs Craft) */}
       <div>
         <label className="text-[11px] font-mono font-bold text-stone-500 uppercase tracking-wider block mb-2.5">
-          ประเภท: Handmade หรือ Craft
+          รูปแบบการผลิต
         </label>
         <div className="grid grid-cols-1 gap-2">
-          {/* Handmade Goods filter */}
           <button
-            onClick={() => onFilterChange('is_made_to_order', filters.is_made_to_order === 'false' ? '' : 'false')}
-            className={`px-3.5 py-2.5 text-xs rounded-2xl border transition-all flex items-center gap-2.5 font-mono ${filters.is_made_to_order === 'false'
-                ? 'border-[#1B4332] bg-[#E8F7F3] text-[#1B4332] font-bold'
+            type="button"
+            onClick={() => onFilterChange('is_made_to_order', '0')}
+            className={`px-3.5 py-2.5 text-xs rounded-2xl border transition-all flex items-center gap-2.5 font-mono ${String(filters.is_made_to_order) === '0'
+                ? 'border-[#1B4332] bg-[#E8F7F3] text-[#1B4332] font-bold shadow-sm'
                 : 'border-stone-200 bg-white text-stone-600 hover:bg-[#FAF9F5]'
               }`}
           >
@@ -68,11 +68,11 @@ export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
             </div>
           </button>
 
-          {/* Craft Studio Items filter */}
           <button
-            onClick={() => onFilterChange('is_made_to_order', filters.is_made_to_order === 'true' ? '' : 'true')}
-            className={`px-3.5 py-2.5 text-xs rounded-2xl border transition-all flex items-center gap-2.5 font-mono ${filters.is_made_to_order === 'true'
-                ? 'border-[#E76F51] bg-[#FFF0EB] text-[#E76F51] font-bold'
+            type="button"
+            onClick={() => onFilterChange('is_made_to_order', '1')}
+            className={`px-3.5 py-2.5 text-xs rounded-2xl border transition-all flex items-center gap-2.5 font-mono ${String(filters.is_made_to_order) === '1'
+                ? 'border-[#E76F51] bg-[#FFF0EB] text-[#E76F51] font-bold shadow-sm'
                 : 'border-stone-200 bg-white text-stone-600 hover:bg-[#FAF9F5]'
               }`}
           >
@@ -88,14 +88,15 @@ export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
       {/* Categories */}
       <div>
         <label className="text-[11px] font-mono font-bold text-stone-500 uppercase tracking-wider block mb-2.5">
-          หมวดหมู่ Handmade &amp; Craft
+          หมวดหมู่สินค้า
         </label>
         <div className="flex flex-col gap-1.5">
           {CATEGORIES.map((cat) => {
-            const active = filters.category === cat.id;
+            const active = String(filters.category) === String(cat.id);
             return (
               <button
                 key={cat.id}
+                type="button"
                 onClick={() => onFilterChange('category', cat.id)}
                 className={`text-left text-xs px-3.5 py-2.5 rounded-2xl transition-all flex items-center justify-between font-medium ${active
                     ? 'bg-[#1B4332] text-[#F4F9F4] font-bold shadow-md'
@@ -138,7 +139,6 @@ export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
           />
         </div>
       </div>
-
     </div>
   );
 };

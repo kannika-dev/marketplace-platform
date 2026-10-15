@@ -205,17 +205,24 @@ export const adminLogin = async (req, res) => {
 };
 
 /**
- * Upgrade current buyer to seller role
+ * Upgrade current buyer to seller role (อัตโนมัติใช้ชื่อจริงของผู้ใช้เป็นชื่อร้านเริ่มต้น)
  */
 export const upgradeToSeller = async (req, res) => {
   try {
     const userId = req.user.id;
     const { store_name, bank_account } = req.body;
 
-    // แก้คอลัมน์เป็น store_name และ bank_account
+    // ดึงชื่อจริง (name) ของผู้ใช้นี้จากฐานข้อมูล
+    const [userRows] = await pool.query('SELECT name FROM users WHERE id = ?', [userId]);
+    const userName = userRows.length > 0 ? userRows[0].name : 'My Craft Studio';
+
+    // ถ้าไม่ได้กรอกชื่อร้านมา ให้ใช้ชื่อ Studio ตามชื่อผู้ใช้เป็นค่าเริ่มต้น
+    const finalStoreName = store_name && store_name.trim() !== '' ? store_name : `Studio ${userName}`;
+
+    // อัปเดตบทบาทและชื่อร้านในฐานข้อมูล
     await pool.query(
       'UPDATE users SET role = "seller", store_name = ?, bank_account = ? WHERE id = ?',
-      [store_name || 'My Craft Studio', bank_account || '-', userId]
+      [finalStoreName, bank_account || '-', userId]
     );
 
     const [rows] = await pool.query(

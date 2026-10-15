@@ -16,6 +16,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ResetPassword from './pages/ResetPassword';
 import SellerProfile from './pages/SellerProfile';
+import PublicShopView from './pages/PublicShopView'; // 🌟 1. นำเข้าหน้าร้านค้าสาธารณะสำหรับผู้ซื้อ
 
 // Buyer Dashboard Pages
 import BuyerDashboard from './pages/buyer/BuyerDashboard';
@@ -87,8 +88,9 @@ export const App = () => {
               <Route path="/register" element={<Register />} />
               <Route path="/reset-password" element={<ResetPassword />} />
 
-              {/* Public Seller / Shop Profile */}
+              {/* Public Seller / Shop Profile & Public Storefront */}
               <Route path="/seller/:id" element={<SellerProfile />} />
+              <Route path="/shop/:sellerId" element={<PublicShopView />} /> {/* 🌟 2. เพิ่ม Route หน้าร้านค้าสาธารณะ */}
 
               {/* Protected Buyer Routes */}
               <Route

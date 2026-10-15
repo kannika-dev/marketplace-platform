@@ -29,3 +29,9 @@ export const getSellerProducts = async () => {
   const response = await api.get('/seller/products');
   return response.data;
 };
+
+// เพิ่มฟังก์ชันดึงหมวดหมู่สินค้าจากฐานข้อมูลแบบ Dynamic 100%
+export const getCategories = async () => {
+  const response = await api.get('/categories');
+  return response.data;
+};
