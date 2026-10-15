@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     User,
     Heart,
@@ -18,7 +19,10 @@ import StatsTab from './tabs/StatsTab';
 
 export const BuyerDashboard = () => {
     const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
-    const [activeTab, setActiveTab] = useState('profile');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabFromUrl = searchParams.get('tab');
+
+    const [activeTab, setActiveTab] = useState(tabFromUrl || 'profile');
     const [refreshKey, setRefreshKey] = useState(0);
 
     const [buyerProfile, setBuyerProfile] = useState({
@@ -28,6 +32,13 @@ export const BuyerDashboard = () => {
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
         role: 'buyer'
     });
+
+    // อัปเดต Tab เมื่อเปลี่ยน Query Parameter ใน URL
+    useEffect(() => {
+        if (tabFromUrl) {
+            setActiveTab(tabFromUrl);
+        }
+    }, [tabFromUrl]);
 
     // ฟังก์ชันดึง Token และแกะ userId จาก JWT Token โดยตรง
     const getStoredToken = () => {
@@ -91,6 +102,12 @@ export const BuyerDashboard = () => {
         setRefreshKey(prev => prev + 1);
     };
 
+    // ฟังก์ชันสำหรับเปลี่ยน Tab และอัปเดต URL ไปด้วย
+    const handleTabChange = (tabName) => {
+        setActiveTab(tabName);
+        setSearchParams({ tab: tabName });
+    };
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -119,48 +136,48 @@ export const BuyerDashboard = () => {
 
                     <div className="clay-card p-3 rounded-3xl border border-white space-y-1.5 shadow-xl bg-white/95 backdrop-blur-md">
                         <button
-                            onClick={() => setActiveTab('profile')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${activeTab === 'profile' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
+                            onClick={() => handleTabChange('profile')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'profile' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
                                 }`}
                         >
                             <User className="w-4 h-4" />
                             <span>โปรไฟล์ของฉัน (Profile)</span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('wishlist')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${activeTab === 'wishlist' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
+                            onClick={() => handleTabChange('wishlist')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'wishlist' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
                                 }`}
                         >
                             <Heart className="w-4 h-4" />
                             <span>รายการโปรด (Wishlist)</span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('cart-orders')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${activeTab === 'cart-orders' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
+                            onClick={() => handleTabChange('cart-orders')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'cart-orders' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
                                 }`}
                         >
                             <ShoppingCart className="w-4 h-4" />
                             <span>ตะกร้าและคำสั่งซื้อ</span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('tracking')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${activeTab === 'tracking' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
+                            onClick={() => handleTabChange('tracking')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'tracking' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
                                 }`}
                         >
                             <PackageCheck className="w-4 h-4" />
                             <span>ติดตามสินค้า (Craft Tracker)</span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('history')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${activeTab === 'history' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
+                            onClick={() => handleTabChange('history')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'history' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
                                 }`}
                         >
                             <History className="w-4 h-4" />
                             <span>ประวัติและสลิปการจ่ายเงิน</span>
                         </button>
                         <button
-                            onClick={() => setActiveTab('stats')}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${activeTab === 'stats' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
+                            onClick={() => handleTabChange('stats')}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === 'stats' ? 'bg-[#1B4332] text-white shadow-md' : 'text-stone-600 hover:bg-emerald-50/60'
                                 }`}
                         >
                             <BarChart3 className="w-4 h-4" />
@@ -174,9 +191,13 @@ export const BuyerDashboard = () => {
                     <div className="clay-card p-6 sm:p-8 rounded-3xl border border-white shadow-xl min-h-[600px] bg-white/95 backdrop-blur-md">
                         {activeTab === 'profile' && <ProfileTab onProfileUpdated={handleProfileUpdated} />}
                         {activeTab === 'wishlist' && <WishlistTab />}
-                        {activeTab === 'cart-orders' && <CartOrdersTab onSelectTab={setActiveTab} />}
+                        {activeTab === 'cart-orders' && <CartOrdersTab onSelectTab={handleTabChange} />}
                         {activeTab === 'tracking' && <CraftTrackingTab />}
-                        {activeTab === 'history' && <HistoryTab />}
+                        {activeTab === 'history' && (
+                            <HistoryTab
+                                onNavigateToTracker={(orderId) => handleTabChange('tracking')}
+                            />
+                        )}
                         {activeTab === 'stats' && <StatsTab />}
                     </div>
                 </div>
