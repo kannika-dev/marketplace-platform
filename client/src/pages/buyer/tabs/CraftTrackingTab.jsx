@@ -82,36 +82,21 @@ export const CraftTrackingTab = () => {
         }
     };
 
-    // 1. ฟังก์ชันผู้ซื้อกด "ยืนยันได้รับสินค้าและเสร็จสิ้น"
+    // 1. ฟังก์ชันผู้ซื้อกด "ยืนยันได้รับสินค้าและเสร็จสิ้น" (แก้ไขให้ยิงตรงเส้น confirm-received)
     const handleConfirmReceived = async (orderId) => {
         if (!window.confirm('คุณได้รับสินค้าถูกต้องและสมบูรณ์แล้วใช่หรือไม่?')) return;
 
         setUpdatingId(orderId);
         try {
-            const formData = new FormData();
-            formData.append('craft_status', 'completed');
-            formData.append('step_title', '🎉 ผู้ซื้อยืนยันได้รับสินค้าเรียบร้อยแล้ว');
-            formData.append('note', 'คำสั่งซื้อเสร็จสมบูรณ์ ลูกค้าได้รับสินค้าเป็นที่เรียบร้อย');
+            const res = await api.patch(`/orders/${orderId}/confirm-received`);
 
-            await api.patch(`/orders/${orderId}/craft-status`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-
-            alert('✨ ขอบคุณสำหรับการยืนยัน! คำสั่งซื้อของคุณเสร็จสมบูรณ์เรียบร้อยแล้ว');
-            fetchTrackingData();
-        } catch (err) {
-            console.error('Confirm received error:', err);
-            try {
-                await api.patch(`/seller/orders/${orderId}/craft-status`, {
-                    craft_status: 'completed',
-                    step_title: '🎉 ผู้ซื้อยืนยันได้รับสินค้าเรียบร้อยแล้ว',
-                    note: 'คำสั่งซื้อเสร็จสมบูรณ์ ลูกค้าได้รับสินค้าเป็นที่เรียบร้อย'
-                });
+            if (res.data?.success || res.status === 200) {
                 alert('✨ ขอบคุณสำหรับการยืนยัน! คำสั่งซื้อของคุณเสร็จสมบูรณ์เรียบร้อยแล้ว');
                 fetchTrackingData();
-            } catch (e) {
-                alert('เกิดข้อผิดพลาดในการยืนยันรับสินค้า กรุณาลองใหม่อีกครั้ง');
             }
+        } catch (err) {
+            console.error('Confirm received error:', err);
+            alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการยืนยันรับสินค้า กรุณาลองใหม่อีกครั้ง');
         } finally {
             setUpdatingId(null);
         }
