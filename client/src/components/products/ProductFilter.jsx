@@ -3,13 +3,13 @@ import { Search, Filter, RotateCcw, Sparkles, Package, Heart, Hammer } from 'luc
 
 const CATEGORIES = [
   { id: 'all', label: 'ทั้งหมด (All)', emoji: '🎨' },
-  { id: 'Ceramics', label: 'เซรามิก & งานปั้น Craft', emoji: '🍵' },
-  { id: 'Woodcraft', label: 'งานไม้ & Craft ทำมือ', emoji: '🪵' },
-  { id: 'Leather', label: 'เครื่องหนัง Handmade', emoji: '👜' },
-  { id: 'Textiles', label: 'งานเย็บปักถักร้อย', emoji: '🧶' },
-  { id: 'Jewelry', label: 'เครื่องประดับ Handmade', emoji: '💍' },
-  { id: 'Candles', label: 'เทียนหอม & สกินแคร์', emoji: '🕯️' },
-  { id: 'HomeDecor', label: 'ของแต่งบ้าน Handmade', emoji: '🏺' },
+  { id: 'เซรามิก', label: 'เซรามิก & งานปั้น Craft', emoji: '🍵' },
+  { id: 'งานไม้', label: 'งานไม้ & Craft ทำมือ', emoji: '🪵' },
+  { id: 'เครื่องหนัง', label: 'เครื่องหนัง Handmade', emoji: '👜' },
+  { id: 'งานเย็บปัก', label: 'งานเย็บปักถักร้อย', emoji: '🧶' },
+  { id: 'เครื่องประดับ', label: 'เครื่องประดับ Handmade', emoji: '💍' },
+  { id: 'เทียนหอม', label: 'เทียนหอม & สกินแคร์', emoji: '🕯️' },
+  { id: 'ของแต่งบ้าน', label: 'ของแต่งบ้าน Handmade', emoji: '🏺' },
 ];
 
 export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
@@ -56,11 +56,10 @@ export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
           {/* Handmade Goods filter */}
           <button
             onClick={() => onFilterChange('is_made_to_order', filters.is_made_to_order === 'false' ? '' : 'false')}
-            className={`px-3.5 py-2.5 text-xs rounded-2xl border transition-all flex items-center gap-2.5 font-mono ${
-              filters.is_made_to_order === 'false'
+            className={`px-3.5 py-2.5 text-xs rounded-2xl border transition-all flex items-center gap-2.5 font-mono ${filters.is_made_to_order === 'false'
                 ? 'border-[#1B4332] bg-[#E8F7F3] text-[#1B4332] font-bold'
                 : 'border-stone-200 bg-white text-stone-600 hover:bg-[#FAF9F5]'
-            }`}
+              }`}
           >
             <Heart className="w-3.5 h-3.5 shrink-0 text-[#1B4332]" />
             <div className="text-left">
@@ -72,11 +71,10 @@ export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
           {/* Craft Studio Items filter */}
           <button
             onClick={() => onFilterChange('is_made_to_order', filters.is_made_to_order === 'true' ? '' : 'true')}
-            className={`px-3.5 py-2.5 text-xs rounded-2xl border transition-all flex items-center gap-2.5 font-mono ${
-              filters.is_made_to_order === 'true'
+            className={`px-3.5 py-2.5 text-xs rounded-2xl border transition-all flex items-center gap-2.5 font-mono ${filters.is_made_to_order === 'true'
                 ? 'border-[#E76F51] bg-[#FFF0EB] text-[#E76F51] font-bold'
                 : 'border-stone-200 bg-white text-stone-600 hover:bg-[#FAF9F5]'
-            }`}
+              }`}
           >
             <Hammer className="w-3.5 h-3.5 shrink-0 text-[#E76F51]" />
             <div className="text-left">
@@ -99,11 +97,10 @@ export const ProductFilter = ({ filters, onFilterChange, onReset }) => {
               <button
                 key={cat.id}
                 onClick={() => onFilterChange('category', cat.id)}
-                className={`text-left text-xs px-3.5 py-2.5 rounded-2xl transition-all flex items-center justify-between font-medium ${
-                  active
+                className={`text-left text-xs px-3.5 py-2.5 rounded-2xl transition-all flex items-center justify-between font-medium ${active
                     ? 'bg-[#1B4332] text-[#F4F9F4] font-bold shadow-md'
                     : 'text-stone-700 hover:bg-[#FAF9F5] hover:text-[#E76F51]'
-                }`}
+                  }`}
               >
                 <span className="flex items-center gap-2">
                   <span>{cat.emoji}</span>

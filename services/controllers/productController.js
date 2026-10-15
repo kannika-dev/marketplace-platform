@@ -8,16 +8,18 @@ export const getProducts = async (req, res) => {
     const { category, is_made_to_order, min_price, max_price, search, sort } = req.query;
 
     let query = `
-      SELECT p.*, u.store_name, u.name as artisan_name 
+      SELECT p.*, u.store_name, u.name as artisan_name, c.name as category_name, c.slug as category_slug
       FROM products p
       LEFT JOIN users u ON p.seller_id = u.id
+      LEFT JOIN categories c ON p.category_id = c.id
       WHERE 1=1
     `;
     const params = [];
 
     if (category && category !== 'all') {
-      query += ` AND p.category_id = ?`;
-      params.push(category);
+      // ✅ รองรับทั้งส่งมาเป็น category_id (ตัวเลข), slug (เช่น 'wood-craft'), หรือชื่อหมวดหมู่
+      query += ` AND (p.category_id = ? OR c.slug = ? OR c.name LIKE ? OR p.category_id IN (SELECT id FROM categories WHERE slug = ? OR name LIKE ?))`;
+      params.push(category, category, `%${category}%`, category, `%${category}%`);
     }
 
     if (is_made_to_order !== undefined && is_made_to_order !== '') {
@@ -73,9 +75,10 @@ export const getProductById = async (req, res) => {
     const { id } = req.params;
 
     const [products] = await pool.query(
-      `SELECT p.*, u.store_name, u.bank_account, u.name as artisan_name, u.email as artisan_email 
+      `SELECT p.*, u.store_name, u.bank_account, u.name as artisan_name, u.email as artisan_email, c.name as category_name, c.slug as category_slug
        FROM products p
        LEFT JOIN users u ON p.seller_id = u.id
+       LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.id = ? LIMIT 1`,
       [id]
     );
@@ -115,20 +118,10 @@ export const getProductById = async (req, res) => {
 
 /**
  * Get products belonging to a seller.
- *
- * @deprecated This route (/products/seller/products) is UNAUTHENTICATED.
- * For secure, per-seller dashboards use GET /seller/products instead
- * (protected by verifyToken — reads seller_id from req.user.id via JWT).
- *
- * This handler is kept only for public-facing shop pages that need to list
- * a specific seller's products without a login session.
  */
 export const getSellerProducts = async (req, res) => {
   try {
-    // ✅ Prefer JWT identity; fall back to explicit query param (public shop pages only)
     const rawId = req.user?.id ?? req.query.seller_id;
-
-    // ✅ Validate: must be present and a valid integer
     const sellerId = parseInt(rawId, 10);
     if (!rawId || isNaN(sellerId) || sellerId <= 0) {
       return res.status(400).json({
@@ -138,11 +131,12 @@ export const getSellerProducts = async (req, res) => {
     }
 
     const [products] = await pool.query(
-      `SELECT p.* 
+      `SELECT p.*, c.name as category_name 
        FROM products p 
+       LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.seller_id = ? 
        ORDER BY p.created_at DESC`,
-      [sellerId]   // ✅ always a safe integer — never a raw user string
+      [sellerId]
     );
 
     return res.json({

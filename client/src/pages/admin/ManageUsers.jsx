@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import Badge from '../../components/common/Badge';
-import { Users, Shield, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Users, Shield, ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const ManageUsers = () => {
@@ -13,16 +13,14 @@ export const ManageUsers = () => {
     setLoading(true);
     try {
       const res = await api.get('/admin/users');
-      if (res.data) {
-        setUsers(res.data.data);
+      // เช็กโครงสร้าง response ทั้ง res.data.data และ res.data เพื่อความชัวร์
+      const fetchedData = res.data?.data || res.data;
+      if (Array.isArray(fetchedData)) {
+        setUsers(fetchedData);
       }
     } catch (err) {
-      console.warn('Fallback users list:', err.message);
-      setUsers([
-        { id: 1, name: 'แอดมินระบบ Craftiverse', email: 'admin@craftiverse.com', role: 'admin', created_at: '2026-09-01' },
-        { id: 2, name: 'เตาเผาดอยสะเก็ด (ช่างปั้น)', email: 'seller@craftiverse.com', role: 'seller', shop_name: 'เตาเผาดอยสะเก็ด', created_at: '2026-09-10' },
-        { id: 3, name: 'สมศรี นักสะสมงานคราฟต์', email: 'buyer@craftiverse.com', role: 'buyer', created_at: '2026-09-15' }
-      ]);
+      console.warn('ดึงข้อมูลผู้ใช้จาก API ไม่สำเร็จ:', err.message);
+      // ถ้า API พังจริง ๆ ให้ลองดึงผ่าน /users ทั่วไป หรือแสดงแจ้งเตือน
     } finally {
       setLoading(false);
     }
@@ -39,8 +37,7 @@ export const ManageUsers = () => {
       alert(`อัปเดตสิทธิ์เป็น ${newRole} สำเร็จแล้ว!`);
       fetchUsers();
     } catch (err) {
-      alert(`อัปเดตสิทธิ์เป็น ${newRole} ในระบบสาธิต (Demo mode)`);
-      fetchUsers();
+      alert(`ไม่สามารถอัปเดตสิทธิ์ได้: ${err.response?.data?.message || err.message}`);
     } finally {
       setUpdatingId(null);
     }
@@ -48,7 +45,7 @@ export const ManageUsers = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      
+
       <div className="flex items-center justify-between">
         <Link
           to="/admin/dashboard"
@@ -57,6 +54,14 @@ export const ManageUsers = () => {
           <ArrowLeft className="w-4 h-4" />
           <span>กลับ Admin Hub</span>
         </Link>
+
+        <button
+          onClick={fetchUsers}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-600 hover:text-[#2A9D8F] bg-white px-3 py-1.5 rounded-xl border border-stone-200 shadow-2xs transition-all"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <span>รีเฟรชข้อมูล</span>
+        </button>
       </div>
 
       <div>
@@ -73,7 +78,14 @@ export const ManageUsers = () => {
 
       <div className="clay-card rounded-3xl overflow-hidden border border-white">
         {loading ? (
-          <div className="p-12 text-center text-xs text-stone-400 font-medium">กำลังโหลดรายชื่อผู้ใช้...</div>
+          <div className="p-12 text-center text-xs text-stone-400 font-medium flex items-center justify-center gap-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-[#2A9D8F]" />
+            <span>กำลังโหลดรายชื่อผู้ใช้จากฐานข้อมูล...</span>
+          </div>
+        ) : users.length === 0 ? (
+          <div className="p-12 text-center text-xs text-stone-400 font-medium">
+            ไม่พบข้อมูลผู้ใช้งาน หรือเชื่อมต่อ API ไม่สำเร็จ
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -92,16 +104,16 @@ export const ManageUsers = () => {
                     <td className="py-4 px-6 font-mono text-stone-400 font-bold">#{u.id}</td>
                     <td className="py-4 px-6 font-display font-bold text-stone-900 text-sm">
                       {u.name}
-                      {u.shop_name && (
+                      {u.store_name && (
                         <span className="block text-[11px] text-[#2A9D8F] font-normal font-sans">
-                          ร้าน: {u.shop_name}
+                          ร้าน: {u.store_name}
                         </span>
                       )}
                     </td>
                     <td className="py-4 px-6 text-stone-600 font-medium">{u.email}</td>
                     <td className="py-4 px-6">
                       <Badge
-                        variant={u.role === 'admin' ? 'dark' : u.role === 'seller' ? 'peach' : 'botanical'}
+                        variant={u.role === 'admin' ? 'emerald' : u.role === 'seller' ? 'terracotta' : 'ivory'}
                         size="xs"
                       >
                         {u.role}
