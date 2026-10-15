@@ -111,7 +111,7 @@ export const createOrder = async (req, res) => {
 };
 
 /**
- * Get orders for currently logged in buyer (ดึงข้อมูล timeline, notes และ image_url ครบถ้วน)
+ * Get orders for currently logged in buyer (ดึงข้อมูล timeline, notes และ image_url ครบถ้วน)[cite: 9]
  */
 export const getMyOrders = async (req, res) => {
   try {
@@ -131,7 +131,7 @@ export const getMyOrders = async (req, res) => {
         [order.id]
       );
 
-      // ดึงประวัติไทม์ไลน์ทั้งหมด พร้อมระบุฟิลด์ image_url และ notes ให้ตรงกับฐานข้อมูลจริง
+      // ดึงประวัติไทม์ไลน์ทั้งหมด พร้อมระบุฟิลด์ image_url และ notes ให้ตรงกับฐานข้อมูลจริง[cite: 9]
       const [logs] = await pool.query(
         `SELECT id, order_id, step, status_title, notes, image_url, created_at 
          FROM craft_tracking_logs 
@@ -155,14 +155,14 @@ export const getMyOrders = async (req, res) => {
 };
 
 /**
- * Get orders for currently logged in buyer (Alias สำหรับ getBuyerOrders)[cite: 12]
+ * Get orders for currently logged in buyer (Alias สำหรับ getBuyerOrders)[cite: 9]
  */
 export const getBuyerOrders = async (req, res) => {
   return getMyOrders(req, res);
 };
 
 /**
- * Get specific order details (for buyer or seller involved)
+ * Get specific order details (for buyer or seller involved)[cite: 9]
  */
 export const getOrderById = async (req, res) => {
   try {
@@ -217,7 +217,7 @@ export const getOrderById = async (req, res) => {
 };
 
 /**
- * Upload payment slip for verification (งวดแรก / เต็มจำนวน)[cite: 12]
+ * Upload payment slip for verification (งวดแรก / เต็มจำนวน)[cite: 9]
  */
 export const uploadPaymentSlip = async (req, res) => {
   try {
@@ -259,7 +259,7 @@ export const uploadPaymentSlip = async (req, res) => {
 };
 
 /**
- * Upload Final Payment Slip (สลิปงวดที่ 2 สำหรับยอดคงเหลือ)[cite: 10]
+ * Upload Final Payment Slip (สลิปงวดที่ 2 สำหรับยอดคงเหลือ)[cite: 9]
  */
 export const uploadFinalPaymentSlip = async (req, res) => {
   try {
@@ -298,5 +298,53 @@ export const uploadFinalPaymentSlip = async (req, res) => {
   } catch (error) {
     console.error('uploadFinalPaymentSlip error:', error);
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Buyer confirms receipt of goods and completes the order
+ */
+export const confirmReceivedOrder = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const { id } = req.params;
+    const buyerId = req.user.id;
+
+    const [orders] = await connection.query(
+      'SELECT * FROM orders WHERE id = ? AND buyer_id = ?',
+      [id, buyerId]
+    );
+
+    if (orders.length === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found or unauthorized.' });
+    }
+
+    await connection.beginTransaction();
+
+    // อัปเดตสถานะออเดอร์เป็น completed
+    await connection.query(
+      `UPDATE orders SET craft_status = 'completed', status = 'completed' WHERE id = ?`,
+      [id]
+    );
+
+    // บันทึกประวัติลงใน Timeline (craft_tracking_logs)
+    await connection.query(
+      `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
+       VALUES (?, 'completed', '🎉 ผู้ซื้อยืนยันได้รับสินค้าเรียบร้อยแล้ว', 'คำสั่งซื้อเสร็จสมบูรณ์ ลูกค้าได้รับสินค้าเป็นที่เรียบร้อย', NULL, NOW())`,
+      [id]
+    );
+
+    await connection.commit();
+
+    return res.json({
+      success: true,
+      message: 'Order marked as completed successfully.'
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('confirmReceivedOrder error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  } finally {
+    connection.release();
   }
 };
