@@ -745,14 +745,16 @@ export const deleteProduct = async (req, res) => {
 };
 
 /**
- * Get orders that involve this seller's products
+ * Get orders that involve this seller's products (รองรับระบบชำระเงิน 2 งวดและสลิปรอบสอง)
  */
 export const getSellerOrders = async (req, res) => {
   try {
     const sellerId = req.user.id;
     const [orders] = await pool.query(
       `SELECT DISTINCT o.id, o.buyer_id, o.status, o.payment_status, o.craft_status, o.total_amount, 
-              o.shipping_address, o.payment_slip_url, o.created_at, u.name as buyer_name, u.email as buyer_email
+              o.shipping_address, o.payment_slip_url, o.final_payment_slip_url, 
+              o.payment_type, o.deposit_amount, o.remaining_balance, o.created_at, 
+              u.name as buyer_name, u.email as buyer_email
        FROM orders o
        JOIN order_items oi ON o.id = oi.order_id
        JOIN products p ON oi.product_id = p.id
@@ -786,7 +788,6 @@ export const updateCraftStatus = async (req, res) => {
   try {
     const { orderId } = req.params;
 
-    // ดึงค่า status และป้องกันกรณีค่าว่างหรือ undefined
     let craft_status = req.body?.craft_status || req.body?.step;
     if (!craft_status || craft_status === 'undefined' || craft_status === 'null') {
       craft_status = 'crafting';
@@ -795,7 +796,6 @@ export const updateCraftStatus = async (req, res) => {
     const step_title = req.body?.step_title || req.body?.status_title || craft_status;
     const note = req.body?.note || req.body?.notes || '';
 
-    // รองรับการรับไฟล์ภาพผ่าน multer (req.file) หรือ URL ตรงๆ
     let imageUrl = null;
     if (req.file) {
       imageUrl = getSecureCloudinaryUrl(req.file);
@@ -803,13 +803,11 @@ export const updateCraftStatus = async (req, res) => {
       imageUrl = req.body.image_url;
     }
 
-    // 1. อัปเดตสถานะล่าสุดในตาราง orders
     await pool.query(
       'UPDATE orders SET craft_status = ? WHERE id = ?',
       [craft_status, orderId]
     );
 
-    // 2. บันทึกลงตาราง log พร้อมรูปภาพ
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
        VALUES (?, ?, ?, ?, ?, NOW())`,

@@ -26,6 +26,20 @@ export const uploadPaymentSlip = async (orderId, file) => {
   return response.data;
 };
 
+/**
+ * อัปโหลดสลิปชำระเงินงวดที่ 2 (ยอดคงเหลือ)
+ */
+export const uploadFinalPaymentSlip = async (orderId, file) => {
+  const formData = new FormData();
+  formData.append('slip', file);
+  const response = await api.post(`/orders/${orderId}/upload-final-slip`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+  return response.data;
+};
+
 export const getSellerOrders = async () => {
   const response = await api.get('/seller/orders');
   return response.data;

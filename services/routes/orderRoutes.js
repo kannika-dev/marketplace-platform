@@ -1,5 +1,5 @@
 import express from 'express';
-import { createOrder, getBuyerOrders, getOrderById, uploadPaymentSlip } from '../controllers/orderController.js';
+import { createOrder, getBuyerOrders, getOrderById, uploadPaymentSlip, uploadFinalPaymentSlip } from '../controllers/orderController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
 
@@ -11,5 +11,6 @@ router.post('/', createOrder);
 router.get('/my-orders', getBuyerOrders);
 router.get('/:id', getOrderById);
 router.post('/:id/upload-slip', upload.single('slip'), uploadPaymentSlip);
+router.post('/:id/upload-final-slip', upload.single('slip'), uploadFinalPaymentSlip);
 
 export default router;

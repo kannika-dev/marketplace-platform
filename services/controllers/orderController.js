@@ -155,7 +155,7 @@ export const getMyOrders = async (req, res) => {
 };
 
 /**
- * Get orders for currently logged in buyer (Alias สำหรับ getBuyerOrders)
+ * Get orders for currently logged in buyer (Alias สำหรับ getBuyerOrders)[cite: 12]
  */
 export const getBuyerOrders = async (req, res) => {
   return getMyOrders(req, res);
@@ -217,7 +217,7 @@ export const getOrderById = async (req, res) => {
 };
 
 /**
- * Upload payment slip for verification
+ * Upload payment slip for verification (งวดแรก / เต็มจำนวน)[cite: 12]
  */
 export const uploadPaymentSlip = async (req, res) => {
   try {
@@ -244,16 +244,59 @@ export const uploadPaymentSlip = async (req, res) => {
     // Add tracking event
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
-       VALUES (?, 'payment_uploaded', 'ส่งหลักฐานการชำระเงินแล้ว', 'รอเจ้าหน้าที่แอดมินตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
+       VALUES (?, 'payment_uploaded', 'ส่งหลักฐานการชำระเงินแล้ว', 'รอเจ้าหน้าที่แอดมินหรือร้านค้าตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
       [id]
     );
 
     return res.json({
       success: true,
-      message: 'Slip uploaded successfully. Waiting for admin verification.',
+      message: 'Slip uploaded successfully. Waiting for verification.',
       slip_url: slipUrl
     });
   } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Upload Final Payment Slip (สลิปงวดที่ 2 สำหรับยอดคงเหลือ)[cite: 10]
+ */
+export const uploadFinalPaymentSlip = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const buyerId = req.user.id;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Please attach final payment slip image.' });
+    }
+
+    const slipUrl = getSecureCloudinaryUrl(req.file);
+
+    const [result] = await pool.query(
+      `UPDATE orders 
+       SET final_payment_slip_url = ?, craft_status = 'final_payment_verification' 
+       WHERE id = ? AND buyer_id = ?`,
+      [slipUrl, id, buyerId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, message: 'Order not found or unauthorized.' });
+    }
+
+    // Add tracking event log
+    await pool.query(
+      `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
+       VALUES (?, 'final_payment_verification', 'แนบหลักฐานการชำระเงินงวดที่ 2 แล้ว', 'รอร้านค้าตรวจสอบสลิปยอดคงเหลือ', ?, NOW())`,
+      [id, slipUrl]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Final payment slip uploaded successfully. Waiting for seller verification.',
+      final_payment_slip_url: slipUrl
+    });
+  } catch (error) {
+    console.error('uploadFinalPaymentSlip error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

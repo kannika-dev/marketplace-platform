@@ -25,7 +25,7 @@ router.put('/products/:id', upload.single('image'), updateProduct);
 router.delete('/products/:id', deleteProduct);
 router.get('/orders', getSellerOrders);
 
-// 📌 เติม upload.single('image') ตรงนี้ เพื่อให้รับรูปภาพความคืบหน้าได้ฉลุย!
+// 📌 รองรับการแนบรูปภาพความคืบหน้างานคราฟต์ผ่าน Multer
 router.patch('/orders/:orderId/craft-status', upload.single('image'), updateCraftStatus);
 
 router.get('/reviews', getSellerReviews);

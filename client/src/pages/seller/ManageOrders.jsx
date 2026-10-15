@@ -9,11 +9,14 @@ import {
   Eye,
   Upload,
   X,
-  Sparkles
+  Sparkles,
+  CreditCard,
+  CheckCircle2,
+  AlertTriangle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-// Quick Tags สำหรับกดเลือกข้อความด่วน (ไม่บังคับพิมพ์เองทั้งหมด)
+// Quick Tags สำหรับกดเลือกข้อความด่วน
 const QUICK_STATUS_TAGS = [
   'รับคำสั่งซื้อแล้ว',
   'เตรียมวัตถุดิบเรียบร้อย',
@@ -21,6 +24,7 @@ const QUICK_STATUS_TAGS = [
   'ลงสี / แต่งแต้มรายละเอียด',
   'สลักชื่อ / Customizing',
   'ตรวจสอบความประณีต (QC)',
+  'ชิ้นงานเสร็จเรียบร้อยแล้ว',
   'จัดส่งพัสดุเรียบร้อยแล้ว'
 ];
 
@@ -56,7 +60,133 @@ export const ManageOrders = () => {
     fetchOrders();
   }, []);
 
-  // ฟังก์ชันบันทึกเรื่องราวงานคราฟต์และอัปโหลดรูปภาพลงฐานข้อมูล
+  // 1. อนุมัติรับคำสั่งซื้อ (ปลดล็อกปุ่มแนบสลิปงวดแรกให้ผู้ซื้อ)
+  const handleApproveOrder = async (orderId) => {
+    if (!window.confirm('คุณต้องการอนุมัติคำสั่งซื้อนี้ เพื่อเปิดให้ลูกค้าแนบสลิปชำระเงินใช่หรือไม่?')) return;
+
+    setUpdatingId(orderId);
+    try {
+      const formData = new FormData();
+      formData.append('craft_status', 'awaiting_deposit');
+      formData.append('step_title', 'รับคำสั่งซื้อเรียบร้อยแล้ว');
+      formData.append('note', 'ร้านค้าอนุมัติคำสั่งซื้อเรียบร้อยแล้ว กรุณาโอนเงินและแนบสลิปชำระเงินค่ะ');
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert('✨ อนุมัติคำสั่งซื้อสำเร็จ! ปลดล็อกช่องแนบสลิปให้ผู้ซื้อเรียบร้อยแล้ว');
+      fetchOrders();
+    } catch (err) {
+      console.error('Approve order error:', err);
+      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอนุมัติคำสั่งซื้อ');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // 2. ยืนยันสลิปถูกต้อง (งวดแรก)
+  const handleApprovePayment = async (orderId) => {
+    if (!window.confirm('คุณต้องการยืนยันว่าสลิปการชำระเงินถูกต้องใช่หรือไม่?')) return;
+
+    setUpdatingId(orderId);
+    try {
+      const formData = new FormData();
+      formData.append('craft_status', 'in_progress');
+      formData.append('step_title', 'ตรวจสอบสลิปมัดจำเรียบร้อย');
+      formData.append('note', 'ร้านค้าตรวจสอบสลิปโอนเงินถูกต้องเรียบร้อยแล้ว เริ่มดำเนินงานคราฟต์พิถีพิถัน');
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert('✨ ยืนยันสลิปถูกต้องแล้ว! เริ่มเข้าสู่ขั้นตอนการผลิต');
+      fetchOrders();
+    } catch (err) {
+      console.error('Approve payment error:', err);
+      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอนุมัติสลิป');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // 3. ปุ่มกดเรียกเก็บเงินงวดที่ 2 (ยอดคงเหลือ 50%)
+  const handleRequestFinalPayment = async (orderId, remainingAmount) => {
+    if (!window.confirm(`คุณต้องการแจ้งผู้ซื้อชำระเงินงวดที่ 2 (ยอดคงเหลือ ฿${remainingAmount.toLocaleString()}) ใช่หรือไม่?`)) return;
+
+    setUpdatingId(orderId);
+    try {
+      const formData = new FormData();
+      formData.append('craft_status', 'awaiting_final_payment');
+      formData.append('step_title', '✨ ผลงานเสร็จเรียบร้อยแล้ว - รอชำระเงินครั้งที่ 2');
+      formData.append('note', `ชิ้นงานของคุณประดิษฐ์เสร็จสมบูรณ์แล้ว กรุณาชำระยอดคงเหลือ ฿${remainingAmount.toLocaleString()} และแนบสลิปรอบสองเพื่อเตรียมการจัดส่งค่ะ`);
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert('✨ ส่งแจ้งเตือนชำระเงินงวดที่ 2 ถึงผู้ซื้อเรียบร้อยแล้ว!');
+      fetchOrders();
+    } catch (err) {
+      console.error('Request final payment error:', err);
+      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการส่งแจ้งเตือน');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // 4. ยืนยันสลิปรอบที่ 2 ถูกต้อง (จ่ายครบ 100% พร้อมส่งมอบ)
+  const handleApproveFinalPayment = async (orderId) => {
+    if (!window.confirm('คุณต้องการยืนยันว่าสลิปการชำระเงินงวดสุดท้ายถูกต้องใช่หรือไม่?')) return;
+
+    setUpdatingId(orderId);
+    try {
+      const formData = new FormData();
+      formData.append('craft_status', 'ready_to_ship');
+      formData.append('step_title', '🎉 ชำระเงินครบถ้วนแล้ว - เตรียมจัดส่ง');
+      formData.append('note', 'ร้านค้าตรวจสอบสลิปงวดสุดท้ายเรียบร้อย ชำระเงินครบถ้วนแล้ว กำลังแพ็กสินค้าเพื่อจัดส่งค่ะ');
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert('✨ ยืนยันชำระเงินครบถ้วน! ออเดอร์พร้อมสำหรับการจัดส่งแล้ว');
+      fetchOrders();
+    } catch (err) {
+      console.error('Approve final payment error:', err);
+      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอนุมัติสลิป');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // 5. ปฏิเสธสลิป (สลิปไม่ถูกต้อง)
+  const handleRejectSlip = async (orderId) => {
+    const reason = prompt('กรุณาระบุเหตุผลที่สลิปไม่ถูกต้อง:');
+    if (!reason) return;
+
+    setUpdatingId(orderId);
+    try {
+      const formData = new FormData();
+      formData.append('craft_status', 'slip_rejected');
+      formData.append('step_title', 'สลิปไม่ถูกต้อง');
+      formData.append('note', `❌ สลิปไม่ถูกต้อง: ${reason} กรุณาตรวจสอบและแนบสลิปใหม่อีกครั้ง`);
+
+      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      alert('✨ ส่งแจ้งเตือนสลิปไม่ถูกต้องไปยังผู้ซื้อเรียบร้อยแล้ว');
+      fetchOrders();
+    } catch (err) {
+      console.error('Reject slip error:', err);
+      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการส่งข้อมูล');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // 6. บันทึกเรื่องราว Artisan Journal
   const handleSaveJournalUpdate = async (orderId, titleText, noteText) => {
     if (!titleText || titleText.trim() === '') {
       alert('กรุณาระบุหัวข้อหรือสถานะความคืบหน้า');
@@ -80,9 +210,8 @@ export const ManageOrders = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert(`✨ บันทึกบันทึกเรื่องราว "${titleText}" เรียบร้อยแล้ว!`);
+      alert(`✨ บันทึกเรื่องราว "${titleText}" เรียบร้อยแล้ว!`);
 
-      // ล้างค่าฟอร์มหลังบันทึกสำเร็จ
       setUpdateImageFile({ ...updateImageFile, [orderId]: null });
       setCustomTitle({ ...customTitle, [orderId]: '' });
       setCustomNote({ ...customNote, [orderId]: '' });
@@ -91,79 +220,6 @@ export const ManageOrders = () => {
     } catch (err) {
       console.error('Update craft status error:', err);
       alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง');
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  const handleApproveOrder = async (orderId) => {
-    if (!window.confirm('คุณต้องการอนุมัติคำสั่งซื้อนี้ เพื่อเปิดให้ลูกค้าแนบสลิปชำระเงินใช่หรือไม่?')) return;
-
-    setUpdatingId(orderId);
-    try {
-      const formData = new FormData();
-      formData.append('craft_status', 'order_placed');
-      formData.append('step_title', 'รับคำสั่งซื้อเรียบร้อยแล้ว');
-      formData.append('note', 'ร้านค้าอนุมัติคำสั่งซื้อเรียบร้อยแล้ว กรุณาโอนเงินและแนบสลิปชำระเงิน');
-
-      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      alert('✨ อนุมัติคำสั่งซื้อสำเร็จ!');
-      fetchOrders();
-    } catch (err) {
-      console.error('Approve order error:', err);
-      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอนุมัติคำสั่งซื้อ');
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  const handleApprovePayment = async (orderId) => {
-    if (!window.confirm('คุณต้องการยืนยันว่าสลิปการชำระเงินถูกต้องใช่หรือไม่?')) return;
-
-    setUpdatingId(orderId);
-    try {
-      const formData = new FormData();
-      formData.append('craft_status', 'material_prep');
-      formData.append('step_title', 'ตรวจสอบสลิปการชำระเงินเรียบร้อย');
-      formData.append('note', 'ร้านค้าตรวจสอบสลิปโอนเงินถูกต้องเรียบร้อยแล้ว เริ่มจัดเตรียมวัตถุดิบ');
-
-      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      alert('✨ ยืนยันสลิปถูกต้องแล้ว!');
-      fetchOrders();
-    } catch (err) {
-      console.error('Approve payment error:', err);
-      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการอนุมัติสลิป');
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  const handleRejectSlip = async (orderId) => {
-    const reason = prompt('กรุณาระบุเหตุผลที่สลิปไม่ถูกต้อง:');
-    if (!reason) return;
-
-    setUpdatingId(orderId);
-    try {
-      const formData = new FormData();
-      formData.append('craft_status', 'order_placed');
-      formData.append('step_title', 'สลิปไม่ถูกต้อง');
-      formData.append('note', `❌ สลิปไม่ถูกต้อง: ${reason} กรุณาตรวจสอบและแนบสลิปใหม่อีกครั้ง`);
-
-      await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      alert('✨ ส่งแจ้งเตือนสลิปไม่ถูกต้องไปยังผู้ซื้อเรียบร้อยแล้ว');
-      fetchOrders();
-    } catch (err) {
-      console.error('Reject slip error:', err);
-      alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการส่งข้อมูล');
     } finally {
       setUpdatingId(null);
     }
@@ -237,9 +293,11 @@ export const ManageOrders = () => {
             className="text-xs font-mono font-bold py-2 px-3 bg-white border border-stone-200 rounded-xl focus:outline-none focus:border-[#1B4332] text-stone-800"
           >
             <option value="all">ALL ORDERS ({orders.length})</option>
-            <option value="order_placed">รับคำสั่งซื้อ</option>
-            <option value="material_prep">เตรียมวัตถุดิบ</option>
-            <option value="crafting">กำลังประดิษฐ์</option>
+            <option value="order_placed">รออนุมัติคำสั่งซื้อ</option>
+            <option value="awaiting_deposit">รอชำระมัดจำ</option>
+            <option value="in_progress">กำลังผลิตงานคราฟต์</option>
+            <option value="awaiting_final_payment">รอชำระเงินงวดที่ 2</option>
+            <option value="ready_to_ship">พร้อมจัดส่ง</option>
             <option value="completed">เสร็จสมบูรณ์</option>
           </select>
         </div>
@@ -257,16 +315,25 @@ export const ManageOrders = () => {
       ) : (
         <div className="space-y-8">
           {filteredOrders.map((ord) => {
-            const isPendingApproval = ord.status === 'pending_approval' || !ord.status || ord.craft_status === 'pending_approval';
-            const isPaymentVerified = ord.payment_status === 'paid' || ord.status === 'paid' || ord.status === 'completed' || (ord.craft_status && ord.craft_status !== 'order_placed' && ord.craft_status !== 'pending_approval');
             const currentCraftStatus = ord.craft_status || 'order_placed';
+            const isDeposit = ord.payment_type === 'deposit';
+
+            const isPendingApproval = currentCraftStatus === 'order_placed' || ord.status === 'pending' || ord.status === 'pending_approval';
+            const hasUploadedSlip = Boolean(ord.payment_slip_url);
+
+            const isAwaitingFinalPayment = currentCraftStatus === 'awaiting_final_payment';
+            const isFinalPaymentVerification = currentCraftStatus === 'final_payment_verification';
             const isCompleted = currentCraftStatus === 'completed';
+
+            const depositAmt = Number(ord.deposit_amount || Math.round(ord.total_amount * 0.5));
+            const remainingAmt = Number(ord.remaining_balance || (ord.total_amount - depositAmt));
 
             return (
               <div
                 key={ord.id}
                 className="bg-white rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl border border-stone-200/80 hover:border-[#1B4332]/30 transition-all"
               >
+                {/* Header คำสั่งซื้อ */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-stone-200 gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-3 flex-wrap">
@@ -275,6 +342,9 @@ export const ManageOrders = () => {
                       </span>
                       <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full bg-emerald-100 text-emerald-900 font-bold border border-emerald-200">
                         STATUS: {currentCraftStatus}
+                      </span>
+                      <span className="text-[10px] font-mono tracking-wider uppercase px-3 py-1 rounded-full bg-stone-100 text-stone-700 font-bold border border-stone-200">
+                        {isDeposit ? 'ชำระแบบมัดจำ 50%' : 'ชำระเต็มจำนวน'}
                       </span>
                     </div>
                     <p className="text-xs text-stone-700 pt-1">
@@ -287,9 +357,15 @@ export const ManageOrders = () => {
                     <span className="text-2xl font-display font-extrabold text-[#E76F51]">
                       ฿{Number(ord.total_amount).toLocaleString()}
                     </span>
+                    {isDeposit && (
+                      <div className="text-[10px] text-stone-500 pt-0.5">
+                        <span>มัดจำ: ฿{depositAmt.toLocaleString()}</span> | <span className="font-bold text-[#E76F51]">คงเหลือ: ฿{remainingAmt.toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
+                {/* แผงควบคุมการอนุมัติและสลิป */}
                 <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     {ord.payment_slip_url ? (
@@ -304,25 +380,40 @@ export const ManageOrders = () => {
                       </div>
                     ) : (
                       <div className="w-16 h-16 rounded-xl bg-stone-200 flex items-center justify-center text-stone-400 text-[10px] font-mono shrink-0">
-                        ไม่มีสลิป
+                        {hasUploadedSlip ? 'มีสลิป' : 'รอสลิป'}
                       </div>
                     )}
-                    <span className="font-bold text-xs text-stone-900">หลักฐานการโอนเงิน &amp; การจัดการออเดอร์</span>
+                    <div>
+                      <span className="font-bold text-xs text-stone-900 block">หลักฐานการโอนเงิน &amp; ปุ่มดำเนินการ</span>
+                      <span className="text-[11px] text-stone-500">
+                        {isPendingApproval
+                          ? 'คำสั่งซื้อใหม่ รอคุณกดอนุมัติเพื่อเปิดรับชำระเงิน'
+                          : isFinalPaymentVerification
+                            ? '🎉 ลูกค้าแนบสลิปงวดสุดท้ายแล้ว กรุณาตรวจสอบ'
+                            : hasUploadedSlip
+                              ? 'ลูกค้าแนบสลิปแล้ว กรุณาตรวจสอบยอดเงิน'
+                              : 'รอผู้ซื้อโอนเงินและแนบสลิป'}
+                      </span>
+                    </div>
                   </div>
 
+                  {/* 🔘 ปุ่มควบคุมฝั่งผู้ขาย */}
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    {/* 1. ปุ่มอนุมัติรับคำสั่งซื้อ */}
                     {isPendingApproval && (
                       <button
                         type="button"
                         disabled={updatingId === ord.id}
                         onClick={() => handleApproveOrder(ord.id)}
-                        className="px-4 py-2.5 bg-[#2A9D8F] hover:bg-[#21867a] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                        className="px-4 py-2.5 bg-[#2A9D8F] hover:bg-[#21867a] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                       >
-                        ✅ อนุมัติรับคำสั่งซื้อ
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>✅ อนุมัติรับคำสั่งซื้อ</span>
                       </button>
                     )}
 
-                    {!isPendingApproval && ord.payment_slip_url && !isPaymentVerified && (
+                    {/* 2. ปุ่มตรวจสลิปงวดแรก */}
+                    {hasUploadedSlip && currentCraftStatus === 'awaiting_deposit' && (
                       <>
                         <button
                           type="button"
@@ -330,7 +421,42 @@ export const ManageOrders = () => {
                           onClick={() => handleApprovePayment(ord.id)}
                           className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
                         >
-                          ✅ ยืนยันสลิปถูกต้อง
+                          ✅ ยืนยันสลิปมัดจำถูกต้อง
+                        </button>
+                        <button
+                          type="button"
+                          disabled={updatingId === ord.id}
+                          onClick={() => handleRejectSlip(ord.id)}
+                          className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          ❌ สลิปไม่ถูกต้อง
+                        </button>
+                      </>
+                    )}
+
+                    {/* 3. ปุ่มกดเรียกเก็บเงินงวดที่ 2 (สำหรับงานมัดจำที่ทำเสร็จแล้ว) */}
+                    {isDeposit && (currentCraftStatus === 'in_progress' || currentCraftStatus === 'production_finished') && (
+                      <button
+                        type="button"
+                        disabled={updatingId === ord.id}
+                        onClick={() => handleRequestFinalPayment(ord.id, remainingAmt)}
+                        className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        <span>🔔 แจ้งชำระเงินงวดที่ 2 (฿{remainingAmt.toLocaleString()})</span>
+                      </button>
+                    )}
+
+                    {/* 4. ปุ่มตรวจสลิปงวดที่ 2 (งวดสุดท้าย) */}
+                    {isFinalPaymentVerification && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={updatingId === ord.id}
+                          onClick={() => handleApproveFinalPayment(ord.id)}
+                          className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          ✅ ยืนยันสลิปรอบ 2 ถูกต้อง (พร้อมจัดส่ง)
                         </button>
                         <button
                           type="button"
@@ -345,6 +471,7 @@ export const ManageOrders = () => {
                   </div>
                 </div>
 
+                {/* รายการสินค้า */}
                 <div className="space-y-3">
                   <span className="text-[10px] font-mono tracking-widest uppercase text-stone-400 font-bold block">
                     ORDERED PIECES // {ord.items?.length || 0} ITEM(S)
@@ -367,7 +494,7 @@ export const ManageOrders = () => {
                   ))}
                 </div>
 
-                {/* 🎨 Artisan Journal Control Panel (อิสระ 100% ไร้ตัวเลขสเต็ปบังคับ) */}
+                {/* 🎨 Artisan Journal Control Panel */}
                 <div className="bg-gradient-to-br from-[#1B4332] to-[#2D6A4F] text-white p-6 rounded-2xl shadow-lg space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
                     <span className="text-xs font-mono font-bold tracking-widest uppercase text-[#FFE6A7] flex items-center gap-2">
@@ -382,7 +509,7 @@ export const ManageOrders = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* 1. หัวข้อสถานะ/กำลังทำอะไรอยู่ (พิมพ์เองอิสระ + Quick Tags) */}
+                      {/* 1. หัวข้อสถานะ/กำลังทำอะไรอยู่ */}
                       <div className="space-y-2">
                         <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
                           1. หัวข้อสถานะ / กำลังทำอะไรอยู่ (พิมพ์เองได้อิสระ)
@@ -472,6 +599,7 @@ export const ManageOrders = () => {
         </div>
       )}
 
+      {/* Modal ขยายรูปสลิป */}
       {previewImage && (
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
