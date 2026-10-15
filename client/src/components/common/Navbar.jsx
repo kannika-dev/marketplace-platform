@@ -13,7 +13,7 @@ import {
   LogOut,
   ArrowRight,
   Store,
-  PackageOpen // 👈 เพิ่มไอคอนสำหรับแดชบอร์ดผู้ซื้อ
+  PackageOpen
 } from 'lucide-react';
 import Badge from './Badge';
 
@@ -111,7 +111,7 @@ export const Navbar = () => {
               Marketplace
             </Link>
 
-            {/* Buyer Dashboard Navigation (แสดงเมื่อเข้าสู่ระบบ) */}
+            {/* Buyer Dashboard Navigation */}
             {user && (
               <Link
                 to="/buyer"
@@ -152,11 +152,7 @@ export const Navbar = () => {
               <div className="flex items-center gap-3 bg-[#FFF9EC] px-4 py-1.5 rounded-full border border-[#FFE6A7] shadow-xs">
                 <Link to="/admin/dashboard" className="flex items-center gap-1.5 text-stone-900 hover:text-[#E76F51]">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-                  Admin Board
-                </Link>
-                <span className="text-amber-200">|</span>
-                <Link to="/admin/verify-payments" className="text-stone-900 hover:text-[#E76F51]">
-                  ตรวจสลิป
+                  ADMIN BOARD
                 </Link>
                 <span className="text-amber-200">|</span>
                 <Link to="/admin/users" className="text-stone-900 hover:text-[#E76F51]">
@@ -355,7 +351,6 @@ export const Navbar = () => {
             <div className="pt-2 border-t border-stone-200 space-y-1">
               <span className="text-[10px] uppercase text-[#1B4332] font-mono font-bold tracking-widest">Admin Board</span>
               <Link to="/admin/dashboard" onClick={() => setMobileMenuOpen(false)} className="block py-1 text-xs font-semibold text-stone-700">ภาพรวมระบบ</Link>
-              <Link to="/admin/verify-payments" onClick={() => setMobileMenuOpen(false)} className="block py-1 text-xs font-semibold text-stone-700">ตรวจสอบสลิป</Link>
               <Link to="/admin/users" onClick={() => setMobileMenuOpen(false)} className="block py-1 text-xs font-semibold text-stone-700">จัดการผู้ใช้</Link>
             </div>
           )}

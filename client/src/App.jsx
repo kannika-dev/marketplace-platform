@@ -29,7 +29,6 @@ import ShopProfile from './pages/seller/ShopProfile';
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ManageUsers from './pages/admin/ManageUsers';
-import VerifyPayments from './pages/admin/VerifyPayments';
 
 const ProtectedRoute = ({ allowedRoles, children }) => {
   const { user, role, loading } = useAuth();
@@ -165,14 +164,6 @@ export const App = () => {
                 element={
                   <ProtectedRoute allowedRoles={['admin']}>
                     <ManageUsers />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/verify-payments"
-                element={
-                  <ProtectedRoute allowedRoles={['admin']}>
-                    <VerifyPayments />
                   </ProtectedRoute>
                 }
               />
