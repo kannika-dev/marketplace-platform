@@ -246,6 +246,7 @@ export const addProduct = async (req, res) => {
     lead_time_days,
     is_made_to_order,
     supports_customization,
+    allow_deposit, // ✅ เพิ่ม allow_deposit ตรงนี้
     options,
     customizations,
     product_customizations
@@ -301,6 +302,7 @@ export const addProduct = async (req, res) => {
       : 3;
 
     const finalIsMadeToOrder = parseBoolean(is_made_to_order, 0);
+    const finalAllowDeposit = parseBoolean(allow_deposit, 0); // ✅ แปลงค่า allow_deposit เป็น 0 หรือ 1
 
     let parsedOptions = [];
     if (options) {
@@ -329,8 +331,8 @@ export const addProduct = async (req, res) => {
     const [productResult] = await connection.query(
       `INSERT INTO products (
         seller_id, category_id, title, description, price, stock_quantity,
-        image_url, supports_customization, is_made_to_order, lead_time_days, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        image_url, supports_customization, is_made_to_order, allow_deposit, lead_time_days, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`, // ✅ เพิ่ม allow_deposit ลงในคำสั่ง INSERT
       [
         sellerId,
         validCategoryId,
@@ -341,6 +343,7 @@ export const addProduct = async (req, res) => {
         imageUrl,
         finalSupportsCustomization,
         finalIsMadeToOrder,
+        finalAllowDeposit, // ✅ ใส่ค่า allow_deposit
         finalLeadTimeDays
       ]
     );
@@ -419,7 +422,7 @@ export const getSellerProducts = async (req, res) => {
       `SELECT
          p.id, p.seller_id, p.category_id, p.title, p.description,
          p.price, p.stock_quantity, p.image_url,
-         p.supports_customization, p.is_made_to_order, p.lead_time_days,
+         p.supports_customization, p.is_made_to_order, p.allow_deposit, p.lead_time_days,
          p.created_at,
          c.name AS category_name, c.slug AS category_slug
        FROM products p
@@ -495,6 +498,7 @@ export const updateProduct = async (req, res) => {
       lead_time_days,
       is_made_to_order,
       supports_customization,
+      allow_deposit, // ✅ เพิ่ม allow_deposit ตรงนี้
       options,
       customizations,
       product_customizations
@@ -555,6 +559,11 @@ export const updateProduct = async (req, res) => {
       ? parseBoolean(supports_customization, current.supports_customization ? 1 : 0)
       : (current.supports_customization ? 1 : 0);
 
+    // ✅ เพิ่มการจัดการ allow_deposit ตอนอัปเดต
+    const newAllowDeposit = allow_deposit !== undefined
+      ? parseBoolean(allow_deposit, current.allow_deposit ? 1 : 0)
+      : (current.allow_deposit ? 1 : 0);
+
     await connection.query(
       `UPDATE products SET 
         title = ?,
@@ -565,7 +574,8 @@ export const updateProduct = async (req, res) => {
         image_url = ?,
         lead_time_days = ?,
         is_made_to_order = ?,
-        supports_customization = ?
+        supports_customization = ?,
+        allow_deposit = ? -- ✅ เพิ่ม allow_deposit ในคำสั่ง UPDATE
        WHERE id = ? AND seller_id = ?`,
       [
         newTitle,
@@ -577,6 +587,7 @@ export const updateProduct = async (req, res) => {
         newLeadTimeDays,
         newIsMadeToOrder,
         newSupportsCustomization,
+        newAllowDeposit, // ✅ ใส่ค่า allow_deposit ใหม่
         productId,
         sellerId
       ]
@@ -644,7 +655,7 @@ export const updateProduct = async (req, res) => {
       `SELECT
          p.id, p.seller_id, p.category_id, p.title, p.description,
          p.price, p.stock_quantity, p.image_url,
-         p.supports_customization, p.is_made_to_order, p.lead_time_days,
+         p.supports_customization, p.is_made_to_order, p.allow_deposit, p.lead_time_days,
          p.created_at,
          c.name AS category_name, c.slug AS category_slug
        FROM products p

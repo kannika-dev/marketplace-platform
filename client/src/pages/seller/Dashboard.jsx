@@ -26,7 +26,7 @@ function Dashboard() {
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
 
-  // ✅ State มาตรฐานสำหรับควบคุม Checkbox (Controlled Components)
+  // ✅ State มาตรฐานสำหรับควบคุม Checkbox ทุกตัวให้เหมือนกันเป๊ะ
   const [editMadeToOrder, setEditMadeToOrder] = useState(false);
   const [editSupportsCust, setEditSupportsCust] = useState(false);
   const [editAllowDeposit, setEditAllowDeposit] = useState(false);
@@ -89,7 +89,7 @@ function Dashboard() {
     return () => clearTimeout(fallbackTimer);
   }, [currentUser]);
 
-  // ✅ ฟังก์ชันเปิด Modal พร้อมเซตค่าตั้งต้นลง State มาตรฐาน
+  // ✅ ฟังก์ชันเปิด Modal เซตค่า Checkbox ทุกตัวให้เป็นมาตรฐานเดียวกัน
   const handleOpenEditModal = (item) => {
     setSelectedProduct(item);
     setEditImageFile(null);
@@ -118,7 +118,7 @@ function Dashboard() {
       formData.append('image', editImageFile);
     }
 
-    // ✅ ยิงค่าจาก State มาตรฐาน ชัวร์และสะอาดที่สุด
+    // ✅ ส่งค่า Checkbox ทั้งหมดด้วยมาตรฐานเดียวกันเป๊ะ
     formData.set('is_made_to_order', editMadeToOrder ? '1' : '0');
     formData.set('supports_customization', editSupportsCust ? '1' : '0');
     formData.set('allow_deposit', editAllowDeposit ? '1' : '0');
@@ -741,12 +741,11 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* ✅ Controlled Checkboxes แบบมาตรฐานสากล เชื่อฟังคำสั่ง 100% */}
+              {/* ✅ Checkbox ทุกตัวใช้ Controlled State มาตรฐานเดียวกันเป๊ะ 100% */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-stone-50 rounded-xl border border-stone-200">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-stone-700">
                   <input
                     type="checkbox"
-                    name="is_made_to_order"
                     checked={editMadeToOrder}
                     onChange={(e) => setEditMadeToOrder(e.target.checked)}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
@@ -757,7 +756,6 @@ function Dashboard() {
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-stone-700">
                   <input
                     type="checkbox"
-                    name="supports_customization"
                     checked={editSupportsCust}
                     onChange={(e) => setEditSupportsCust(e.target.checked)}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
@@ -768,7 +766,6 @@ function Dashboard() {
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800">
                   <input
                     type="checkbox"
-                    name="allow_deposit"
                     checked={editAllowDeposit}
                     onChange={(e) => setEditAllowDeposit(e.target.checked)}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
