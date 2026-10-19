@@ -17,7 +17,8 @@ import {
   HeartHandshake,
   Percent,
   MapPin,
-  Phone
+  Phone,
+  AlertCircle
 } from 'lucide-react';
 
 export const Checkout = () => {
@@ -62,6 +63,22 @@ export const Checkout = () => {
   const [errorMsg, setErrorMsg] = useState('');
 
   const totalAmount = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
+
+  // ✅ ตรวจสอบว่าสินค้าในตะกร้าทุกชิ้นหรือบางชิ้น อนุญาตให้มัดจำหรือไม่
+  // ถ้ามีสินค้าตัวใดตัวหนึ่งในตะกร้าตั้งค่า allow_deposit === 0 (หรือ false) จะถือว่าห้ามมัดจำ 50% ต้องจ่ายเต็มเท่านั้น
+  const isDepositAllowed = cart.every((item) => {
+    // เช็กค่า allow_deposit (ถ้าเป็น undefined หรือ null หรือ 1 ให้ถือว่าอนุญาต, ถ้าเป็น 0 หรือ false คือไม่อนุญาต)
+    const allow = item.allow_deposit !== undefined ? Number(item.allow_deposit) : 1;
+    return allow === 1;
+  });
+
+  // ถ้าสินค้าไม่อนุญาตให้มัดจำ บังคับให้ paymentType เป็น 'full' เสมอ
+  useEffect(() => {
+    if (!isDepositAllowed) {
+      setPaymentType('full');
+    }
+  }, [isDepositAllowed]);
+
   const depositAmount = Math.round(totalAmount * 0.5);
   const payableNow = paymentType === 'deposit' ? depositAmount : totalAmount;
 
@@ -326,6 +343,18 @@ export const Checkout = () => {
                   <label className="text-xs font-bold text-stone-800 block">
                     เลือกรูปแบบการชำระเงินสำหรับงานแฮนด์เมด (Made-to-Order) *
                   </label>
+
+                  {/* ✅ เงื่อนไขเช็ก allow_deposit: ถ้าไม่อนุญาตให้มัดจำ ให้แสดงกล่องแจ้งเตือนและบังคับจ่ายเต็มเท่านั้น */}
+                  {!isDepositAllowed ? (
+                    <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center gap-2.5">
+                      <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+                      <div>
+                        <span className="font-bold block">สินค้าชิ้นนี้กำหนดให้ชำระเงินเต็มจำนวนเท่านั้น (100% Full Payment)</span>
+                        <span className="text-[11px] text-amber-700">เนื่องจากร้านค้าไม่อนุญาตให้เลือกจ่ายมัดจำสำหรับสินค้ารายการนี้ ระบบจึงถูกล็อกไว้ที่การชำระเต็มจำนวนโดยไม่ต้องรออนุมัติ</span>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div
                       onClick={() => setPaymentType('full')}
@@ -340,18 +369,21 @@ export const Checkout = () => {
                       </div>
                     </div>
 
-                    <div
-                      onClick={() => setPaymentType('deposit')}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'deposit' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'}`}
-                    >
-                      <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${paymentType === 'deposit' ? 'bg-[#2A9D8F] text-white' : 'bg-stone-100 text-stone-400'}`}>
-                        <Percent className="w-3.5 h-3.5" />
+                    {/* ✅ ถ้า isDepositAllowed เป็น true ถึงจะแสดงตัวเลือกมัดจำ 50% ให้ลูกค้ากดเลือกได้ */}
+                    {isDepositAllowed && (
+                      <div
+                        onClick={() => setPaymentType('deposit')}
+                        className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-start gap-3 ${paymentType === 'deposit' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/40'}`}
+                      >
+                        <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${paymentType === 'deposit' ? 'bg-[#2A9D8F] text-white' : 'bg-stone-100 text-stone-400'}`}>
+                          <Percent className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-stone-900 block">จ่ายมัดจำ 50% (Deposit)</span>
+                          <span className="text-[11px] text-stone-500 block mt-0.5">จ่ายมัดจำก่อน ฿{depositAmount.toLocaleString()} (ส่วนที่เหลือจ่ายก่อนส่งมอบ)</span>
+                        </div>
                       </div>
-                      <div>
-                        <span className="text-xs font-bold text-stone-900 block">จ่ายมัดจำ 50% (Deposit)</span>
-                        <span className="text-[11px] text-stone-500 block mt-0.5">จ่ายมัดจำก่อน ฿{depositAmount.toLocaleString()} (ส่วนที่เหลือจ่ายก่อนส่งมอบ)</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
 
@@ -494,7 +526,7 @@ export const Checkout = () => {
                     ตรวจสอบและยืนยันคำสั่งซื้อ (Review & Place Order)
                   </h3>
                   <p className="text-xs text-stone-500 font-normal">
-                    ตรวจสอบความถูกต้องของรายการสั่งทำและเงื่อนไขการมัดจำ
+                    ตรวจสอบความถูกต้องของรายการสั่งทำและเงื่อนไขการชำระเงิน
                   </p>
                 </div>
               </div>

@@ -11,7 +11,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   Leaf,
-  Loader2
+  Loader2,
+  CreditCard
 } from 'lucide-react';
 
 export const AddProduct = () => {
@@ -25,6 +26,7 @@ export const AddProduct = () => {
   const [stock, setStock] = useState('5');
   const [leadTimeDays, setLeadTimeDays] = useState('7');
   const [isMadeToOrder, setIsMadeToOrder] = useState(true);
+  const [allowDeposit, setAllowDeposit] = useState(true); // ✅ เพิ่ม State สำหรับอนุญาตให้มัดจำ 50%
   const [materials, setMaterials] = useState('');
   const [craftTechnique, setCraftTechnique] = useState('');
   const [imageFile, setImageFile] = useState(null);
@@ -75,6 +77,7 @@ export const AddProduct = () => {
       formData.append('stock', Number(stock) || 0);
       formData.append('lead_time_days', Number(leadTimeDays) || 0);
       formData.append('is_made_to_order', isMadeToOrder ? '1' : '0');
+      formData.append('allow_deposit', allowDeposit ? '1' : '0'); // ✅ พ่วงค่า allow_deposit ไปให้หลังบ้าน
 
       if (imageFile) {
         formData.append('image', imageFile);
@@ -127,7 +130,7 @@ export const AddProduct = () => {
           ลงขายผลงานคราฟต์ & งานทำมือ
         </h1>
         <p className="text-xs sm:text-sm text-stone-500 mt-1 font-normal">
-          กำหนดระยะเวลาทำมือ (Lead Time), ตั้งค่า Made-to-Order และตัวเลือกปรับแต่งชิ้นงาน
+          กำหนดระยะเวลาทำมือ (Lead Time), ตั้งค่าเงื่อนไขการชำระเงิน และตัวเลือกปรับแต่งชิ้นงาน
         </p>
       </div>
 
@@ -159,7 +162,7 @@ export const AddProduct = () => {
               />
             </div>
 
-            {/* หมวดหมู่: มี Dropdown เลือก + ช่องกรอกเองเมื่อเลือก "อื่นๆ" */}
+            {/* หมวดหมู่ */}
             <div className="sm:col-span-2 space-y-3">
               <label className="text-xs font-bold text-stone-700 block mb-1.5">หมวดหมู่งานคราฟต์ *</label>
               <select
@@ -177,7 +180,6 @@ export const AddProduct = () => {
                 <option value="other">✏️ อื่นๆ (ระบุชื่อหมวดหมู่เอง)</option>
               </select>
 
-              {/* แสดงช่องกรอกข้อความเฉพาะตอนที่เลือก "อื่นๆ" */}
               {categorySelect === 'other' && (
                 <input
                   type="text"
@@ -216,11 +218,11 @@ export const AddProduct = () => {
           </div>
         </div>
 
-        {/* Made-to-Order & Lead Time Configuration */}
+        {/* Made-to-Order & Payment Rules Configuration */}
         <div className="clay-card p-7 sm:p-9 rounded-3xl space-y-6 border border-white">
           <h2 className="text-sm font-display font-bold uppercase tracking-wider text-stone-900 border-b border-emerald-100 pb-3.5 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-[#E76F51]" />
-            <span>การตั้งค่าผลิตงานคราฟต์ (Lead Time & Made-to-Order)</span>
+            <span>การตั้งค่าผลิต & เงื่อนไขชำระเงิน</span>
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
@@ -237,6 +239,25 @@ export const AddProduct = () => {
                 checked={isMadeToOrder}
                 onChange={(e) => setIsMadeToOrder(e.target.checked)}
                 className="w-5 h-5 accent-[#E76F51] rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* ✅ เพิ่มส่วนตั้งค่าเงื่อนไขมัดจำ 50% */}
+            <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between shadow-2xs">
+              <div>
+                <span className="text-xs font-bold text-[#2A9D8F] block flex items-center gap-1">
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>อนุญาตให้มัดจำ 50% ได้</span>
+                </span>
+                <span className="text-[11px] text-stone-600 font-medium">
+                  {allowDeposit ? 'ลูกค้าเลือกได้ว่าจะจ่ายเต็ม หรือมัดจำ 50%' : 'บังคับชำระเงินเต็มจำนวน 100% เท่านั้น'}
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={allowDeposit}
+                onChange={(e) => setAllowDeposit(e.target.checked)}
+                className="w-5 h-5 accent-[#2A9D8F] rounded-lg cursor-pointer"
               />
             </div>
 

@@ -17,7 +17,6 @@ export const getProducts = async (req, res) => {
     const params = [];
 
     if (category && category !== 'all') {
-      // ✅ รองรับทั้งส่งมาเป็น category_id (ตัวเลข), slug (เช่น 'wood-craft'), หรือชื่อหมวดหมู่
       query += ` AND (p.category_id = ? OR c.slug = ? OR c.name LIKE ? OR p.category_id IN (SELECT id FROM categories WHERE slug = ? OR name LIKE ?))`;
       params.push(category, category, `%${category}%`, category, `%${category}%`);
     }
@@ -42,7 +41,6 @@ export const getProducts = async (req, res) => {
       params.push(`%${search}%`, `%${search}%`);
     }
 
-    // Sort order
     if (sort === 'price_asc') {
       query += ` ORDER BY p.price ASC`;
     } else if (sort === 'price_desc') {
@@ -92,7 +90,6 @@ export const getProductById = async (req, res) => {
 
     const product = products[0];
 
-    // Fetch customisation options (e.g. engravings, colors, sizes)
     const [options] = await pool.query(
       'SELECT * FROM product_options WHERE product_id = ?',
       [id]
@@ -146,6 +143,67 @@ export const getSellerProducts = async (req, res) => {
     });
   } catch (error) {
     console.error('getSellerProducts error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Create a new product (รองรับ allow_deposit)
+ */
+export const createProduct = async (req, res) => {
+  try {
+    const sellerId = req.user?.id; // ดึงจาก Token ของร้านค้า
+    const { title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
+
+    // แปลงค่า allow_deposit เป็น 0 หรือ 1 (ถ้าไม่ได้ส่งมา ให้ค่าเริ่มต้นเป็น 1)
+    const depositAllowed = allow_deposit !== undefined ? (allow_deposit ? 1 : 0) : 1;
+
+    const [result] = await pool.query(
+      `INSERT INTO products (seller_id, title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sellerId, title, description, price, stock || 1, category_id, is_made_to_order ? 1 : 0, image_url, depositAllowed]
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Product created successfully.',
+      productId: result.insertId
+    });
+  } catch (error) {
+    console.error('createProduct error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Update an existing product (รองรับ allow_deposit)
+ */
+export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
+
+    const depositAllowed = allow_deposit !== undefined ? (allow_deposit ? 1 : 0) : 1;
+
+    await pool.query(
+      `UPDATE products 
+       SET title = ?, description = ?, price = ?, stock = ?, category_id = ?, is_made_to_order = ?, image_url = ?, allow_deposit = ?
+       WHERE id = ?`,
+      [title, description, price, stock, category_id, is_made_to_order ? 1 : 0, image_url, depositAllowed, id]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Product updated successfully.'
+    });
+  } catch (error) {
+    console.error('updateProduct error:', error);
     return res.status(500).json({
       success: false,
       message: error.message
