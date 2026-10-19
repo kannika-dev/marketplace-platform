@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// ดึง VITE_API_URL มาใช้ ถ้านึกไม่ออกให้กลับไปใช้ localhost:5000
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://marketplace-platform-yzsx.onrender.com';
+// บังคับชี้ไปที่ Backend บน Render แบบถาวร เพื่อไม่ให้หลุดไปหา GitHub Pages
+const API_BASE_URL = 'https://marketplace-platform-yzsx.onrender.com';
 
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api`,
