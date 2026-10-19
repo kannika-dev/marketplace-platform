@@ -1,11 +1,23 @@
 import express from 'express';
-import { getProducts, getProductById, getSellerProducts } from '../controllers/productController.js';
+import {
+    getProducts,
+    getProductById,
+    getSellerProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct
+} from '../controllers/productController.js';
 
 const router = express.Router();
 
+// Public routes
 router.get('/', getProducts);
-// ย้ายเส้นทางที่เป็นคำเฉพาะเจาะจงมาไว้ข้างบน ก่อนหน้า :id เสมอ
-router.get('/seller/products', getSellerProducts);
 router.get('/:id', getProductById);
+
+// Seller routes (จัดการสินค้าของผู้ขาย)
+router.get('/seller/products', getSellerProducts);
+router.post('/seller/products', createProduct);
+router.put('/seller/products/:id', updateProduct);       // 👈 ตัวนี้แหละที่หายไป!
+router.delete('/seller/products/:id', deleteProduct);
 
 export default router;
