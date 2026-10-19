@@ -79,7 +79,9 @@ export const AddProduct = () => {
       formData.append('is_made_to_order', isMadeToOrder ? '1' : '0');
 
       // ✅ ส่งค่า '1' หรือ '0' ตามสถานะ Checkbox อย่างแม่นยำ
-      formData.append('allow_deposit', allowDeposit ? '1' : '0');
+      const allowDepositVal = allowDeposit ? '1' : '0';
+      formData.append('allow_deposit', allowDepositVal);
+      console.log('🔍 [ADD PRODUCT] ค่า allow_deposit ที่กำลังส่งไป:', allowDepositVal);
 
       if (imageFile) {
         formData.append('image', imageFile);

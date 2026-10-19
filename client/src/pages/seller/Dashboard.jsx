@@ -645,7 +645,7 @@ function Dashboard() {
         </div>
       )}
 
-      {/* --- MODAL แก้ไขสินค้า (เพิ่ม key บังคับ Reset Form เมื่อสลับสินค้า) --- */}
+      {/* --- MODAL แก้ไขสินค้า --- */}
       {selectedProduct && (
         <div key={selectedProduct.id} className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -759,12 +759,12 @@ function Dashboard() {
                   <span>รองรับการปรับแต่ง (Customization)</span>
                 </label>
 
-                {/* ✅ Checkbox อนุญาตให้มัดจำ 50% ที่แก้ไขตรรกะ defaultChecked ให้ตรงเป๊ะ */}
+                {/* ✅ Checkbox อนุญาตให้มัดจำ 50% ที่แก้ไขเรียบร้อยแล้ว อ่านค่าตาม DB ตรงๆ */}
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800">
                   <input
                     type="checkbox"
                     name="allow_deposit"
-                    defaultChecked={selectedProduct.allow_deposit !== undefined ? Boolean(Number(selectedProduct.allow_deposit)) : true}
+                    defaultChecked={Boolean(Number(selectedProduct.allow_deposit ?? 0))}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
                   />
                   <span>อนุญาตให้มัดจำ 50%</span>
