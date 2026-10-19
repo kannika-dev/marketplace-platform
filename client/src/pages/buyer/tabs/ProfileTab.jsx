@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { User, Phone, MapPin, Share2, Save, AlertCircle, CheckCircle2, UploadCloud, Image as ImageIcon } from 'lucide-react';
 
 export const ProfileTab = ({ onProfileUpdated }) => {
-    const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
+    const BACKEND_URL = 'https://marketplace-platform-yzsx.onrender.com';
 
     const [profile, setProfile] = useState({
         name: '',

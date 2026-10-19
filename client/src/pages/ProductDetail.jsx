@@ -77,7 +77,7 @@ export const ProductDetail = () => {
         const targetSellerId = productData?.seller_id || productData?.shop_id;
         if (targetSellerId) {
           try {
-            const shopRes = await fetch(`https://marketplace-platform-xh1q.onrender.com/api/shops/seller/${targetSellerId}`);
+            const shopRes = await fetch(`https://marketplace-platform-yzsx.onrender.com/api/shops/seller/${targetSellerId}`);
             const shopData = await shopRes.json();
             if (shopData.success && shopData.shop) {
               setShopInfo(shopData.shop);

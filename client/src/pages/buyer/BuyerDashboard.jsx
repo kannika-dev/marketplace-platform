@@ -18,7 +18,7 @@ import HistoryTab from './tabs/HistoryTab';
 import StatsTab from './tabs/StatsTab';
 
 export const BuyerDashboard = () => {
-    const BACKEND_URL = 'https://marketplace-platform-xh1q.onrender.com';
+    const BACKEND_URL = 'https://marketplace-platform-yzsx.onrender.com';
     const [searchParams, setSearchParams] = useSearchParams();
     const tabFromUrl = searchParams.get('tab');
 

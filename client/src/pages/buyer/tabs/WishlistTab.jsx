@@ -15,7 +15,7 @@ export const WishlistTab = () => {
             setLoading(true);
             const craft_token = localStorage.getItem('craft_token') || sessionStorage.getItem('craft_token');
 
-            const response = await axios.get('https://marketplace-platform-xh1q.onrender.com/api/wishlist', {
+            const response = await axios.get('https://marketplace-platform-yzsx.onrender.com/api/wishlist', {
                 headers: { Authorization: `Bearer ${craft_token}` }
             });
 
@@ -45,7 +45,7 @@ export const WishlistTab = () => {
         try {
             const craft_token = localStorage.getItem('craft_token') || sessionStorage.getItem('craft_token');
             const response = await axios.post(
-                'https://marketplace-platform-xh1q.onrender.com/api/wishlist/toggle',
+                'https://marketplace-platform-yzsx.onrender.com/api/wishlist/toggle',
                 { productId },
                 { headers: { Authorization: `Bearer ${craft_token}` } }
             );

@@ -30,7 +30,7 @@ export const ProductCard = ({ product }) => {
         const craft_token = localStorage.getItem('craft_token') || sessionStorage.getItem('craft_token');
         if (!craft_token) return;
 
-        const res = await axios.get('https://marketplace-platform-xh1q.onrender.com/api/wishlist', {
+        const res = await axios.get('https://marketplace-platform-yzsx.onrender.com/api/wishlist', {
           headers: { Authorization: `Bearer ${craft_token}` }
         });
 
@@ -62,7 +62,7 @@ export const ProductCard = ({ product }) => {
     try {
       setLoading(true);
       const response = await axios.post(
-        'https://marketplace-platform-xh1q.onrender.com/api/wishlist/toggle',
+        'https://marketplace-platform-yzsx.onrender.com/api/wishlist/toggle',
         { productId: id },
         { headers: { Authorization: `Bearer ${craft_token}` } }
       );
