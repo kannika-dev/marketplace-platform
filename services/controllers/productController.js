@@ -156,14 +156,15 @@ export const getSellerProducts = async (req, res) => {
 export const createProduct = async (req, res) => {
   try {
     const sellerId = req.user?.id; // ดึงจาก Token ของร้านค้า
-    const { title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
+    const { title, description, price, stock, stock_quantity, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
 
+    const finalStock = stock !== undefined ? stock : (stock_quantity !== undefined ? stock_quantity : 1);
     const depositAllowed = (allow_deposit === '0' || allow_deposit === 0 || allow_deposit === false) ? 0 : 1;
 
     const [result] = await pool.query(
       `INSERT INTO products (seller_id, title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [sellerId, title, description, price, stock || 1, category_id, is_made_to_order ? 1 : 0, image_url, depositAllowed]
+      [sellerId, title, description, price, finalStock, category_id, is_made_to_order ? 1 : 0, image_url, depositAllowed]
     );
 
     return res.status(201).json({
@@ -181,25 +182,37 @@ export const createProduct = async (req, res) => {
 };
 
 /**
- * Update an existing product (รองรับ allow_deposit แบบชัวร์ 100%)
+ * Update an existing product (รองรับ allow_deposit และ stock_quantity แบบชัวร์ 100%)
  */
 export const updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
+    const { title, description, price, stock, stock_quantity, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
+
+    const finalStock = stock !== undefined ? stock : (stock_quantity !== undefined ? stock_quantity : 0);
 
     let depositAllowed = 1;
     if (allow_deposit === 0 || allow_deposit === '0' || allow_deposit === false || allow_deposit === 'false') {
       depositAllowed = 0;
     }
 
-    console.log('>>> ค่า allow_deposit ที่รับมา:', allow_deposit, '-> แปลงเป็น:', depositAllowed);
+    console.log('>>> [UPDATE] ID:', id, '| allow_deposit ที่รับมา:', allow_deposit, '-> แปลงเป็น:', depositAllowed, '| stock:', finalStock);
 
     await pool.query(
       `UPDATE products 
        SET title = ?, description = ?, price = ?, stock = ?, category_id = ?, is_made_to_order = ?, image_url = ?, allow_deposit = ?
        WHERE id = ?`,
-      [title, description, price, stock, category_id, is_made_to_order ? 1 : 0, image_url, depositAllowed, id]
+      [
+        title,
+        description,
+        price,
+        finalStock,
+        category_id,
+        is_made_to_order === 'true' || is_made_to_order === '1' || is_made_to_order === true ? 1 : 0,
+        image_url,
+        depositAllowed,
+        id
+      ]
     );
 
     return res.json({
