@@ -209,3 +209,25 @@ export const updateProduct = async (req, res) => {
     });
   }
 };
+
+/**
+ * Delete an existing product
+ */
+export const deleteProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await pool.query('DELETE FROM products WHERE id = ?', [id]);
+
+    return res.json({
+      success: true,
+      message: 'Product deleted successfully.'
+    });
+  } catch (error) {
+    console.error('deleteProduct error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
