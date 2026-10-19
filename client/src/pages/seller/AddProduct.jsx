@@ -26,7 +26,7 @@ export const AddProduct = () => {
   const [stock, setStock] = useState('5');
   const [leadTimeDays, setLeadTimeDays] = useState('7');
   const [isMadeToOrder, setIsMadeToOrder] = useState(true);
-  const [allowDeposit, setAllowDeposit] = useState(true); // ✅ เพิ่ม State สำหรับอนุญาตให้มัดจำ 50%
+  const [allowDeposit, setAllowDeposit] = useState(true); // State ตั้งต้นอนุญาตให้มัดจำ 50%
   const [materials, setMaterials] = useState('');
   const [craftTechnique, setCraftTechnique] = useState('');
   const [imageFile, setImageFile] = useState(null);
@@ -77,7 +77,9 @@ export const AddProduct = () => {
       formData.append('stock', Number(stock) || 0);
       formData.append('lead_time_days', Number(leadTimeDays) || 0);
       formData.append('is_made_to_order', isMadeToOrder ? '1' : '0');
-      formData.append('allow_deposit', allowDeposit ? '1' : '0'); // ✅ พ่วงค่า allow_deposit ไปให้หลังบ้าน
+
+      // ✅ ส่งค่า '1' หรือ '0' ตามสถานะ Checkbox อย่างแม่นยำ
+      formData.append('allow_deposit', allowDeposit ? '1' : '0');
 
       if (imageFile) {
         formData.append('image', imageFile);
@@ -242,7 +244,7 @@ export const AddProduct = () => {
               />
             </div>
 
-            {/* ✅ เพิ่มส่วนตั้งค่าเงื่อนไขมัดจำ 50% */}
+            {/* ส่วนตั้งค่าเงื่อนไขมัดจำ 50% */}
             <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between shadow-2xs">
               <div>
                 <span className="text-xs font-bold text-[#2A9D8F] block flex items-center gap-1">

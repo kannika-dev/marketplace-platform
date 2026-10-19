@@ -158,8 +158,7 @@ export const createProduct = async (req, res) => {
     const sellerId = req.user?.id; // ดึงจาก Token ของร้านค้า
     const { title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
 
-    // แปลงค่า allow_deposit เป็น 0 หรือ 1 (ถ้าไม่ได้ส่งมา ให้ค่าเริ่มต้นเป็น 1)
-    const depositAllowed = allow_deposit !== undefined ? (allow_deposit ? 1 : 0) : 1;
+    const depositAllowed = (allow_deposit === '0' || allow_deposit === 0 || allow_deposit === false) ? 0 : 1;
 
     const [result] = await pool.query(
       `INSERT INTO products (seller_id, title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit) 
@@ -189,7 +188,7 @@ export const updateProduct = async (req, res) => {
     const { id } = req.params;
     const { title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
 
-    const depositAllowed = allow_deposit !== undefined ? (allow_deposit ? 1 : 0) : 1;
+    const depositAllowed = (allow_deposit === '0' || allow_deposit === 0 || allow_deposit === false) ? 0 : 1;
 
     await pool.query(
       `UPDATE products 

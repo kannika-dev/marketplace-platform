@@ -107,12 +107,22 @@ function Dashboard() {
     const supportsCustInput = formElement.elements['supports_customization'];
     formData.set('supports_customization', supportsCustInput && supportsCustInput.checked ? '1' : '0');
 
+    // ✅ บังคับส่งค่า 1 หรือ 0 ตามการติ๊ก Checkbox
+    const allowDepositInput = formElement.elements['allow_deposit'];
+    const isAllowDepositChecked = allowDepositInput ? allowDepositInput.checked : true;
+    const allowDepositVal = isAllowDepositChecked ? '1' : '0';
+    formData.set('allow_deposit', allowDepositVal);
+
+    // 🔍 ปริ้นค่าดูใน Console (F12) เพื่อเช็กสถานะก่อนส่งไป API
+    console.log('🔍 [DEBUG] ค่า allow_deposit ที่กำลังจะส่งไปหลังบ้านคือ:', allowDepositVal);
+
     const stockVal = formData.get('stock_quantity') || '0';
     formData.set('stock_quantity', stockVal);
     formData.set('stock', stockVal);
 
     try {
       const res = await api.put(`/seller/products/${selectedProduct.id}`, formData);
+      console.log('✅ [DEBUG] บันทึกสำเร็จ Response:', res.data);
       setEditSuccess(res.data?.message || 'อัปเดตสินค้าเรียบร้อยแล้ว!');
       await fetchDashboardData();
 
@@ -122,7 +132,7 @@ function Dashboard() {
         setEditSuccess(null);
       }, 700);
     } catch (err) {
-      console.error('Update product error:', err);
+      console.error('❌ [DEBUG] Update product error:', err);
       const errMsg = err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการอัปเดตสินค้า';
       setEditError(errMsg);
     } finally {
@@ -730,7 +740,7 @@ function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-stone-50 rounded-xl border border-stone-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-stone-50 rounded-xl border border-stone-200">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-stone-700">
                   <input
                     type="checkbox"
@@ -740,6 +750,7 @@ function Dashboard() {
                   />
                   <span>สั่งทำตามออเดอร์ (Made-to-order)</span>
                 </label>
+
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-stone-700">
                   <input
                     type="checkbox"
@@ -748,6 +759,17 @@ function Dashboard() {
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
                   />
                   <span>รองรับการปรับแต่ง (Customization)</span>
+                </label>
+
+                {/* ✅ Checkbox อนุญาตให้มัดจำ 50% ใน Modal แก้ไขสินค้า */}
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800">
+                  <input
+                    type="checkbox"
+                    name="allow_deposit"
+                    defaultChecked={selectedProduct.allow_deposit !== undefined ? Boolean(Number(selectedProduct.allow_deposit)) : true}
+                    className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
+                  />
+                  <span>อนุญาตให้มัดจำ 50%</span>
                 </label>
               </div>
 
