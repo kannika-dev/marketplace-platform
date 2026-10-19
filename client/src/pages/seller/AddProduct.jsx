@@ -26,7 +26,10 @@ export const AddProduct = () => {
   const [stock, setStock] = useState('5');
   const [leadTimeDays, setLeadTimeDays] = useState('7');
   const [isMadeToOrder, setIsMadeToOrder] = useState(true);
-  const [allowDeposit, setAllowDeposit] = useState(true); // State ตั้งต้นอนุญาตให้มัดจำ 50%
+
+  // ✅ ควบคุม State อนุญาตให้มัดจำ 50% ด้วยมาตรฐานที่แม่นยำ
+  const [allowDeposit, setAllowDeposit] = useState(true);
+
   const [materials, setMaterials] = useState('');
   const [craftTechnique, setCraftTechnique] = useState('');
   const [imageFile, setImageFile] = useState(null);
@@ -56,7 +59,6 @@ export const AddProduct = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // กำหนดค่าหมวดหมู่ที่จะส่งจริง (ถ้าเลือก "อื่นๆ" ให้เอาจากช่องพิมพ์ระบุเอง)
     const finalCategory = categorySelect === 'other' ? customCategory.trim() : categorySelect;
 
     if (!title || !price || !finalCategory) {
@@ -78,7 +80,7 @@ export const AddProduct = () => {
       formData.append('lead_time_days', Number(leadTimeDays) || 0);
       formData.append('is_made_to_order', isMadeToOrder ? '1' : '0');
 
-      // ✅ ส่งค่า '1' หรือ '0' ตามสถานะ Checkbox อย่างแม่นยำ
+      // ✅ ส่งค่า '1' หรือ '0' ตามสถานะ State อย่างแม่นยำ 100%
       const allowDepositVal = allowDeposit ? '1' : '0';
       formData.append('allow_deposit', allowDepositVal);
       console.log('🔍 [ADD PRODUCT] ค่า allow_deposit ที่กำลังส่งไป:', allowDepositVal);
@@ -246,7 +248,7 @@ export const AddProduct = () => {
               />
             </div>
 
-            {/* ส่วนตั้งค่าเงื่อนไขมัดจำ 50% */}
+            {/* ✅ ส่วนตั้งค่าเงื่อนไขมัดจำ 50% เชื่อม State สอดคล้องกันเป๊ะ */}
             <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between shadow-2xs">
               <div>
                 <span className="text-xs font-bold text-[#2A9D8F] block flex items-center gap-1">
@@ -391,7 +393,7 @@ export const AddProduct = () => {
           <button
             type="submit"
             disabled={loading}
-            className="px-9 py-4 btn-3d-peach text-xs font-bold rounded-2xl disabled:opacity-50 flex items-center gap-2"
+            className="px-9 py-4 btn-3d-peach text-xs font-bold rounded-2xl disabled:opacity-50 flex items-center gap-2 cursor-pointer"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             <span>{loading ? 'กำลังบันทึกลงฐานข้อมูล...' : 'เผยแพร่ผลงานสู่มาร์เก็ตเพลส'}</span>

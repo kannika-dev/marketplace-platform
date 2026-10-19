@@ -26,6 +26,11 @@ function Dashboard() {
   const [editError, setEditError] = useState(null);
   const [editSuccess, setEditSuccess] = useState(null);
 
+  // ✅ State มาตรฐานสำหรับควบคุม Checkbox (Controlled Components)
+  const [editMadeToOrder, setEditMadeToOrder] = useState(false);
+  const [editSupportsCust, setEditSupportsCust] = useState(false);
+  const [editAllowDeposit, setEditAllowDeposit] = useState(false);
+
   // State สำหรับจัดการ Modal สนทนาตอบกลับรีวิว
   const [activeReviewModal, setActiveReviewModal] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
@@ -42,7 +47,7 @@ function Dashboard() {
       const [analyticsRes, productsRes, ordersRes, shopRes, reviewsRes] = await Promise.allSettled([
         api.get(`/shops/analytics/${currentUser.id}`),
         api.get(`/seller/products`),
-        api.get(`/seller/orders`), // ดึงออเดอร์ของผู้ขายโดยตรง
+        api.get(`/seller/orders`),
         api.get(`/shops/seller/${currentUser.id}`),
         api.get(`/seller/reviews`)
       ]);
@@ -84,6 +89,18 @@ function Dashboard() {
     return () => clearTimeout(fallbackTimer);
   }, [currentUser]);
 
+  // ✅ ฟังก์ชันเปิด Modal พร้อมเซตค่าตั้งต้นลง State มาตรฐาน
+  const handleOpenEditModal = (item) => {
+    setSelectedProduct(item);
+    setEditImageFile(null);
+    setEditError(null);
+    setEditSuccess(null);
+
+    setEditMadeToOrder(Boolean(Number(item.is_made_to_order ?? 0)));
+    setEditSupportsCust(Boolean(Number(item.supports_customization ?? 0)));
+    setEditAllowDeposit(Boolean(Number(item.allow_deposit ?? 0)));
+  };
+
   const handleUpdateProductSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProduct) return;
@@ -101,18 +118,10 @@ function Dashboard() {
       formData.append('image', editImageFile);
     }
 
-    // 🔍 อ่านค่า Checkbox สดๆ จากหน้าจอ ณ วินาทีที่กดเซฟ
-    const isMadeToOrderChecked = Boolean(formElement.querySelector('input[name="is_made_to_order"]')?.checked);
-    const isSupportsCustChecked = Boolean(formElement.querySelector('input[name="supports_customization"]')?.checked);
-    const isAllowDepositChecked = Boolean(formElement.querySelector('input[name="allow_deposit"]')?.checked);
-
-    const allowDepositVal = isAllowDepositChecked ? '1' : '0';
-
-    formData.set('is_made_to_order', isMadeToOrderChecked ? '1' : '0');
-    formData.set('supports_customization', isSupportsCustChecked ? '1' : '0');
-    formData.set('allow_deposit', allowDepositVal);
-
-    console.log('🔍 [FRONTEND CHECK] ค่า allow_deposit ที่กำลังยิงไปหลังบ้าน:', allowDepositVal);
+    // ✅ ยิงค่าจาก State มาตรฐาน ชัวร์และสะอาดที่สุด
+    formData.set('is_made_to_order', editMadeToOrder ? '1' : '0');
+    formData.set('supports_customization', editSupportsCust ? '1' : '0');
+    formData.set('allow_deposit', editAllowDeposit ? '1' : '0');
 
     const stockVal = formData.get('stock_quantity') || '0';
     formData.set('stock_quantity', stockVal);
@@ -120,7 +129,6 @@ function Dashboard() {
 
     try {
       const res = await api.put(`/seller/products/${selectedProduct.id}`, formData);
-      console.log('✅ [FRONTEND] อัปเดตสำเร็จ Response:', res.data);
       setEditSuccess(res.data?.message || 'อัปเดตสินค้าเรียบร้อยแล้ว!');
       await fetchDashboardData();
 
@@ -130,7 +138,7 @@ function Dashboard() {
         setEditSuccess(null);
       }, 700);
     } catch (err) {
-      console.error('❌ [FRONTEND] Update product error:', err);
+      console.error('❌ Update product error:', err);
       const errMsg = err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการอัปเดตสินค้า';
       setEditError(errMsg);
     } finally {
@@ -365,12 +373,7 @@ function Dashboard() {
                 {products.map((item) => (
                   <div
                     key={item.id}
-                    onClick={() => {
-                      setSelectedProduct(item);
-                      setEditImageFile(null);
-                      setEditError(null);
-                      setEditSuccess(null);
-                    }}
+                    onClick={() => handleOpenEditModal(item)}
                     className="p-4 border border-stone-200 rounded-xl bg-stone-50/50 flex gap-4 items-center cursor-pointer hover:border-emerald-600 hover:shadow-md transition-all group"
                   >
                     <img src={item.image_url || 'https://via.placeholder.com/80'} alt={item.title} className="w-16 h-16 object-cover rounded-lg border border-stone-200" />
@@ -434,7 +437,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* TAB: ติดตามสถานะงานช่างฝีมือ (ReadOnly + Link to ManageOrders) */}
+        {/* TAB: ติดตามสถานะงานช่างฝีมือ */}
         {activeTab === 'craft' && (
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-100 pb-3">
@@ -738,12 +741,14 @@ function Dashboard() {
                 </div>
               </div>
 
+              {/* ✅ Controlled Checkboxes แบบมาตรฐานสากล เชื่อฟังคำสั่ง 100% */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-stone-50 rounded-xl border border-stone-200">
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-stone-700">
                   <input
                     type="checkbox"
                     name="is_made_to_order"
-                    defaultChecked={Boolean(Number(selectedProduct.is_made_to_order))}
+                    checked={editMadeToOrder}
+                    onChange={(e) => setEditMadeToOrder(e.target.checked)}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
                   />
                   <span>สั่งทำตามออเดอร์ (Made-to-order)</span>
@@ -753,18 +758,19 @@ function Dashboard() {
                   <input
                     type="checkbox"
                     name="supports_customization"
-                    defaultChecked={Boolean(Number(selectedProduct.supports_customization))}
+                    checked={editSupportsCust}
+                    onChange={(e) => setEditSupportsCust(e.target.checked)}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
                   />
                   <span>รองรับการปรับแต่ง (Customization)</span>
                 </label>
 
-                {/* ✅ Checkbox อนุญาตให้มัดจำ 50% ที่แก้ไขเรียบร้อยแล้ว อ่านค่าตาม DB ตรงๆ */}
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800">
                   <input
                     type="checkbox"
                     name="allow_deposit"
-                    defaultChecked={Boolean(Number(selectedProduct.allow_deposit ?? 0))}
+                    checked={editAllowDeposit}
+                    onChange={(e) => setEditAllowDeposit(e.target.checked)}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
                   />
                   <span>อนุญาตให้มัดจำ 50%</span>
