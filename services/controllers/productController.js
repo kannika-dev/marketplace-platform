@@ -181,20 +181,19 @@ export const createProduct = async (req, res) => {
 };
 
 /**
- * Update an existing product (รองรับ allow_deposit)
+ * Update an existing product (รองรับ allow_deposit แบบชัวร์ 100%)
  */
 export const updateProduct = async (req, res) => {
   try {
-    // 🔍 แอบส่องค่าที่ส่งมาจากหน้าบ้านตรงนี้
-    console.log('>>> 🟢 RAW REQ.BODY:', req.body);
-    console.log('>>> 🟢 allow_deposit ที่ได้รับ:', req.body.allow_deposit, typeof req.body.allow_deposit);
-
     const { id } = req.params;
     const { title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
 
-    const depositAllowed = (allow_deposit === '0' || allow_deposit === 0 || allow_deposit === false) ? 0 : 1;
+    let depositAllowed = 1;
+    if (allow_deposit === 0 || allow_deposit === '0' || allow_deposit === false || allow_deposit === 'false') {
+      depositAllowed = 0;
+    }
 
-    console.log('>>> 🟢 แปลงค่าเป็น depositAllowed ได้:', depositAllowed);
+    console.log('>>> ค่า allow_deposit ที่รับมา:', allow_deposit, '-> แปลงเป็น:', depositAllowed);
 
     await pool.query(
       `UPDATE products 

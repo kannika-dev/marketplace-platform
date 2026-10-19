@@ -107,9 +107,9 @@ function Dashboard() {
     const supportsCustInput = formElement.elements['supports_customization'];
     formData.set('supports_customization', supportsCustInput && supportsCustInput.checked ? '1' : '0');
 
-    // ✅ บังคับส่งค่า 1 หรือ 0 ตามการติ๊ก Checkbox
+    // ✅ บังคับส่งค่า '1' หรือ '0' ตามสถานะ Checkbox อย่างแม่นยำ
     const allowDepositInput = formElement.elements['allow_deposit'];
-    const isAllowDepositChecked = allowDepositInput ? allowDepositInput.checked : true;
+    const isAllowDepositChecked = allowDepositInput ? allowDepositInput.checked : false;
     const allowDepositVal = isAllowDepositChecked ? '1' : '0';
     formData.set('allow_deposit', allowDepositVal);
 
