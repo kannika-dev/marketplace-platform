@@ -9,13 +9,58 @@ export const CartOrdersTab = ({ onSelectTab }) => {
     const { cart, removeFromCart, clearCart, addToCart } = useAuth();
     const navigate = useNavigate();
 
-    const [couponCode, setCouponCode] = useState('');
     const [discount, setDiscount] = useState(0);
     const [orders, setOrders] = useState([]);
     const [loadingOrders, setLoadingOrders] = useState(true);
 
-    const totalAmount = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
-    const finalAmount = Math.max(0, totalAmount - discount);
+    // เก็บสถานะการเลือกชำระเงินของแต่ละชิ้นในตะกร้า (Key: index หรือ item.id, Value: 'full' หรือ 'deposit')
+    const [itemPaymentTypes, setItemPaymentTypes] = useState({});
+
+    // เมื่อตะกร้าเปลี่ยน ให้กำหนดค่าเริ่มต้นเป็น 'full' หรือค่าเดิมที่เคยเลือกไว้
+    useEffect(() => {
+        const initialTypes = {};
+        cart.forEach((item, index) => {
+            if (!itemPaymentTypes[index]) {
+                initialTypes[index] = 'full';
+            } else {
+                initialTypes[index] = itemPaymentTypes[index];
+            }
+        });
+        setItemPaymentTypes(prev => ({ ...initialTypes, ...prev }));
+    }, [cart]);
+
+    const handlePaymentTypeChange = (index, type) => {
+        setItemPaymentTypes(prev => ({
+            ...prev,
+            [index]: type
+        }));
+    };
+
+    // คำนวณยอดเงินแยกตามการเลือกของลูกค้า
+    const calculateTotals = () => {
+        let totalFullPrice = 0;
+        let dueNow = 0;
+        let remainingBalance = 0;
+
+        cart.forEach((item, index) => {
+            const itemTotal = Number(item.price) * item.quantity;
+            totalFullPrice += itemTotal;
+
+            const pType = itemPaymentTypes[index] || 'full';
+            if (pType === 'deposit' && (item.allow_deposit === 1 || item.allow_deposit === true)) {
+                const depositVal = itemTotal / 2;
+                dueNow += depositVal;
+                remainingBalance += (itemTotal - depositVal);
+            } else {
+                dueNow += itemTotal;
+            }
+        });
+
+        const finalDueNow = Math.max(0, dueNow - discount);
+        return { totalFullPrice, finalDueNow, remainingBalance };
+    };
+
+    const { totalFullPrice, finalDueNow, remainingBalance } = calculateTotals();
 
     const fetchOrders = async () => {
         try {
@@ -58,6 +103,22 @@ export const CartOrdersTab = ({ onSelectTab }) => {
             console.error('Error uploading slip:', err);
             alert('อัปโหลดสลิปไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
         }
+    };
+
+    // ส่งข้อมูลตะกร้าพร้อมแนบรูปแบบการชำระเงินไปหน้า Checkout
+    const handleProceedToCheckout = () => {
+        const cartWithPaymentOptions = cart.map((item, index) => ({
+            ...item,
+            chosen_payment_type: itemPaymentTypes[index] || 'full'
+        }));
+
+        navigate('/checkout', {
+            state: {
+                cartItems: cartWithPaymentOptions,
+                dueNow: finalDueNow,
+                remainingBalance: remainingBalance
+            }
+        });
     };
 
     return (
@@ -116,31 +177,63 @@ export const CartOrdersTab = ({ onSelectTab }) => {
 
                                 {cart.map((item, index) => {
                                     const customOptions = item.selectedOptions || item.customization_notes;
+                                    const canAllowDeposit = item.allow_deposit === 1 || item.allow_deposit === true;
+                                    const currentType = itemPaymentTypes[index] || 'full';
+
                                     return (
-                                        <div key={index} className="clay-card p-4 rounded-2xl border border-stone-100 bg-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                                            <div className="flex items-center gap-3">
-                                                <img src={item.image_url || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=300&q=80'} alt={item.title} className="w-16 h-16 rounded-xl object-cover shrink-0" />
-                                                <div className="space-y-1">
-                                                    <h4 className="text-xs font-bold text-stone-900">{item.title}</h4>
-                                                    <p className="text-[11px] text-[#2A9D8F]">฿{Number(item.price).toLocaleString()} / ชิ้น</p>
-                                                    {customOptions && (
-                                                        <span className="text-[10px] text-[#E76F51] bg-[#FFF0EB] px-2 py-0.5 rounded-md inline-block">
-                                                            ✨ {typeof customOptions === 'string' ? customOptions : JSON.stringify(customOptions)}
-                                                        </span>
-                                                    )}
+                                        <div key={index} className="clay-card p-4 rounded-2xl border border-stone-100 bg-white space-y-3">
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                                <div className="flex items-center gap-3">
+                                                    <img src={item.image_url || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=300&q=80'} alt={item.title} className="w-16 h-16 rounded-xl object-cover shrink-0" />
+                                                    <div className="space-y-1">
+                                                        <h4 className="text-xs font-bold text-stone-900">{item.title}</h4>
+                                                        <p className="text-[11px] text-[#2A9D8F]">฿{Number(item.price).toLocaleString()} / ชิ้น</p>
+                                                        {customOptions && (
+                                                            <span className="text-[10px] text-[#E76F51] bg-[#FFF0EB] px-2 py-0.5 rounded-md inline-block">
+                                                                ✨ {typeof customOptions === 'string' ? customOptions : JSON.stringify(customOptions)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                                                    <div className="flex items-center border border-stone-200 rounded-xl bg-white p-0.5">
+                                                        <button onClick={() => handleUpdateQuantity(item, -1)} className="w-6 h-6 flex items-center justify-center text-stone-600 font-bold cursor-pointer"><Minus className="w-3 h-3" /></button>
+                                                        <span className="px-2 text-xs font-bold">{item.quantity}</span>
+                                                        <button onClick={() => handleUpdateQuantity(item, 1)} className="w-6 h-6 flex items-center justify-center text-stone-600 font-bold cursor-pointer"><Plus className="w-3 h-3" /></button>
+                                                    </div>
+
+                                                    <span className="text-sm font-extrabold text-[#E76F51]">฿{(Number(item.price) * item.quantity).toLocaleString()}</span>
+                                                    <button onClick={() => removeFromCart(index)} className="p-1.5 text-stone-400 hover:text-rose-500 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center justify-between w-full sm:w-auto gap-4">
-                                                <div className="flex items-center border border-stone-200 rounded-xl bg-white p-0.5">
-                                                    <button onClick={() => handleUpdateQuantity(item, -1)} className="w-6 h-6 flex items-center justify-center text-stone-600 font-bold cursor-pointer"><Minus className="w-3 h-3" /></button>
-                                                    <span className="px-2 text-xs font-bold">{item.quantity}</span>
-                                                    <button onClick={() => handleUpdateQuantity(item, 1)} className="w-6 h-6 flex items-center justify-center text-stone-600 font-bold cursor-pointer"><Plus className="w-3 h-3" /></button>
+                                            {/* ส่วนเลือกรูปแบบการชำระเงินสำหรับสินค้าชิ้นนี้ (แสดงเฉพาะชิ้นที่อนุญาต allow_deposit) */}
+                                            {canAllowDeposit && (
+                                                <div className="pt-2 border-t border-stone-100 flex items-center gap-4 text-xs">
+                                                    <span className="text-stone-500 font-medium">รูปแบบการชำระเงิน:</span>
+                                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name={`payment-type-${index}`}
+                                                            checked={currentType === 'full'}
+                                                            onChange={() => handlePaymentTypeChange(index, 'full')}
+                                                            className="text-[#2A9D8F] focus:ring-[#2A9D8F]"
+                                                        />
+                                                        <span className="text-stone-800 font-medium">ชำระเต็มจำนวน</span>
+                                                    </label>
+                                                    <label className="flex items-center gap-1.5 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            name={`payment-type-${index}`}
+                                                            checked={currentType === 'deposit'}
+                                                            onChange={() => handlePaymentTypeChange(index, 'deposit')}
+                                                            className="text-[#2A9D8F] focus:ring-[#2A9D8F]"
+                                                        />
+                                                        <span className="text-stone-800 font-medium">มัดจำ 50% (งวดแรก)</span>
+                                                    </label>
                                                 </div>
-
-                                                <span className="text-sm font-extrabold text-[#E76F51]">฿{(Number(item.price) * item.quantity).toLocaleString()}</span>
-                                                <button onClick={() => removeFromCart(index)} className="p-1.5 text-stone-400 hover:text-rose-500 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
-                                            </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -149,16 +242,23 @@ export const CartOrdersTab = ({ onSelectTab }) => {
                             <div className="lg:col-span-4 clay-card p-5 rounded-2xl border border-stone-100 bg-white space-y-4">
                                 <h3 className="text-sm font-bold text-stone-900 border-b border-stone-100 pb-2">สรุปรายการสั่งซื้อ</h3>
                                 <div className="space-y-2 text-xs text-stone-600">
-                                    <div className="flex justify-between"><span>ยอดรวมสินค้า</span><span className="font-bold">฿{totalAmount.toLocaleString()}</span></div>
+                                    <div className="flex justify-between"><span>ยอดรวมสินค้าทั้งหมด</span><span className="font-bold">฿{totalFullPrice.toLocaleString()}</span></div>
                                     <div className="flex justify-between text-[#2A9D8F]"><span>ค่าจัดส่ง</span><span className="font-bold">ฟรี</span></div>
+
+                                    {remainingBalance > 0 && (
+                                        <div className="flex justify-between text-amber-600 pt-1 border-t border-stone-50">
+                                            <span>ยอดค้างชำระงวดสอง</span>
+                                            <span className="font-bold">฿{remainingBalance.toLocaleString()}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="border-t border-stone-100 pt-3 flex justify-between items-baseline">
-                                    <span className="text-xs font-bold">ยอดชำระสุทธิ</span>
-                                    <span className="text-xl font-extrabold text-[#E76F51]">฿{finalAmount.toLocaleString()}</span>
+                                    <span className="text-xs font-bold text-stone-900">ยอดชำระงวดแรก (Due Now)</span>
+                                    <span className="text-xl font-extrabold text-[#E76F51]">฿{finalDueNow.toLocaleString()}</span>
                                 </div>
 
-                                <button onClick={() => navigate('/checkout')} className="w-full py-3 rounded-xl btn-3d-peach text-xs font-bold flex items-center justify-center gap-2 cursor-pointer">
+                                <button onClick={handleProceedToCheckout} className="w-full py-3 rounded-xl btn-3d-peach text-xs font-bold flex items-center justify-center gap-2 cursor-pointer">
                                     <span>ชำระเงิน</span>
                                     <ArrowRight className="w-3.5 h-3.5" />
                                 </button>
@@ -210,7 +310,6 @@ export const CartOrdersTab = ({ onSelectTab }) => {
                                                     if (onSelectTab) {
                                                         onSelectTab('tracker');
                                                     } else {
-                                                        // Fallback ถ้าไม่มี onSelectTab ส่งมา ให้สั่งเปลี่ยน URL หรือบังคับรีเฟรชหน้าไปแท็บ tracker
                                                         window.location.href = '#tracker';
                                                         window.location.reload();
                                                     }

@@ -2,13 +2,13 @@ import pool from '../config/db.js';
 import { getSecureCloudinaryUrl } from '../middleware/uploadMiddleware.js';
 
 /**
- * Create a new order with items and initial craft tracker state
+ * Create a new order with items and initial craft tracker state (Supporting per-item payment selection)
  */
 export const createOrder = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const buyerId = req.user.id;
-    const { items, shipping_address, note, payment_type, payment_method, deposit_amount, remaining_balance } = req.body;
+    const { items, shipping_address, note, payment_method } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
@@ -20,11 +20,14 @@ export const createOrder = async (req, res) => {
     await connection.beginTransaction();
 
     let totalAmount = 0;
+    let calculatedDeposit = 0;
+    let calculatedRemaining = 0;
+    let hasAnyDeposit = false;
     const calculatedItems = [];
 
     for (const item of items) {
       const [productRows] = await connection.query(
-        'SELECT id, title, price, seller_id, is_made_to_order, lead_time_days FROM products WHERE id = ?',
+        'SELECT id, title, price, seller_id, is_made_to_order, lead_time_days, allow_deposit FROM products WHERE id = ?',
         [item.product_id]
       );
 
@@ -34,21 +37,35 @@ export const createOrder = async (req, res) => {
 
       const prod = productRows[0];
       const quantity = Math.max(1, Number(item.quantity) || 1);
-      const subtotal = Number(prod.price) * quantity;
-      totalAmount += subtotal;
+      const itemTotal = Number(prod.price) * quantity;
+      totalAmount += itemTotal;
+
+      // ตรวจสอบประเภทการชำระเงินรายชิ้นที่ส่งมาจากหน้าตะกร้า/Checkout
+      const itemPaymentType = item.payment_type || 'full';
+      const isAllowed = prod.allow_deposit === 1 || prod.allow_deposit === true;
+
+      let itemDueNow = itemTotal;
+      let itemRemaining = 0;
+
+      if (itemPaymentType === 'deposit' && isAllowed) {
+        itemDueNow = itemTotal / 2;
+        itemRemaining = itemTotal - itemDueNow;
+        hasAnyDeposit = true;
+      }
+
+      calculatedDeposit += itemDueNow;
+      calculatedRemaining += itemRemaining;
 
       calculatedItems.push({
         product_id: prod.id,
         price: prod.price,
         quantity,
+        payment_type: (itemPaymentType === 'deposit' && isAllowed) ? 'deposit' : 'full',
         customization_notes: item.customization_notes || item.customization_details ? JSON.stringify(item.customization_notes || item.customization_details) : null
       });
     }
 
-    // คำนวณยอดมัดจำและยอดคงเหลือกรณีเลือกแบบ deposit
-    const selectedPaymentType = payment_type || 'full';
-    const calculatedDeposit = selectedPaymentType === 'deposit' ? Math.round(totalAmount * 0.5) : totalAmount;
-    const calculatedRemaining = selectedPaymentType === 'deposit' ? (totalAmount - calculatedDeposit) : 0;
+    const overallPaymentType = hasAnyDeposit ? 'deposit' : 'full';
 
     // Insert order master
     const [orderResult] = await connection.query(
@@ -59,7 +76,7 @@ export const createOrder = async (req, res) => {
         totalAmount,
         'unpaid',
         shipping_address || '',
-        selectedPaymentType,
+        overallPaymentType,
         payment_method || 'bank_transfer',
         calculatedDeposit,
         calculatedRemaining
@@ -68,12 +85,12 @@ export const createOrder = async (req, res) => {
 
     const orderId = orderResult.insertId;
 
-    // Insert order items
+    // Insert order items พร้อมบันทึก payment_type แยกตามรายชิ้น
     for (const it of calculatedItems) {
       await connection.query(
-        `INSERT INTO order_items (order_id, product_id, quantity, price, customization_notes)
-         VALUES (?, ?, ?, ?, ?)`,
-        [orderId, it.product_id, it.quantity, it.price, it.customization_notes]
+        `INSERT INTO order_items (order_id, product_id, quantity, price, payment_type, customization_notes)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [orderId, it.product_id, it.quantity, it.price, it.payment_type, it.customization_notes]
       );
     }
 
@@ -92,8 +109,9 @@ export const createOrder = async (req, res) => {
       data: {
         orderId,
         totalAmount,
-        payment_type: selectedPaymentType,
+        payment_type: overallPaymentType,
         deposit_amount: calculatedDeposit,
+        remaining_balance: calculatedRemaining,
         status: 'unpaid'
       }
     });
