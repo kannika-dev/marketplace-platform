@@ -78,7 +78,7 @@ export const Checkout = () => {
     return acc;
   }, {});
 
-  // ดึงข้อมูลร้านค้าทั้งหมดที่อยู่ในตะกร้าจาก Backend
+  // ดึงข้อมูลร้านค้าทั้งหมดที่อยู่ในตะกร้าจาก Backend (แบบยืดหยุ่นรองรับทุกโครงสร้าง)
   useEffect(() => {
     const fetchAllShops = async () => {
       const sellerIds = Object.keys(groupedBySeller);
@@ -90,8 +90,15 @@ export const Checkout = () => {
           const res = await axios.get(`/api/shops/seller/${sId}`);
           const shopData = res.data?.data || res.data;
 
-          if (shopData && shopData.seller_id) {
-            newShopsMap[sId] = shopData;
+          if (shopData) {
+            newShopsMap[sId] = {
+              shop_name: shopData.shop_name || groupedBySeller[sId]?.sellerName || `ร้านค้า #${sId}`,
+              bank_name: shopData.bank_name || 'ธนาคารกสิกรไทย (KBANK)',
+              bank_account: shopData.bank_account || '000-0-00000-0',
+              account_name: shopData.account_name || 'ผู้ขาย',
+              promptpay_number: shopData.promptpay_number || '',
+              qr_code_url: shopData.qr_code_url || ''
+            };
           } else {
             throw new Error('Shop data not found');
           }
@@ -181,7 +188,6 @@ export const Checkout = () => {
     try {
       const fullAddressPayload = `${receiverName} (โทร: ${phoneNumber})\nบ้านเลขที่/ซอย: ${addressNo}\nตำบล/แขวง: ${subdistrict} อ.เภอ/เขต: ${district}\nจ. ${province} รหัสไปรษณีย์ ${postalCode}`;
 
-      // 1. สร้าง FormData หรือ JSON Payload สำหรับส่งออเดอร์
       const orderPayload = {
         shipping_address: fullAddressPayload,
         note: `[รูปแบบการชำระเงิน: ${hasAnyDeposit ? 'ผสมผสาน (มีรายการมัดจำ)' : 'ชำระเต็มจำนวน'}] ${note}`,
@@ -195,9 +201,6 @@ export const Checkout = () => {
       };
 
       const res = await createOrder(orderPayload);
-
-      // ถ้าร้านมีระบบสร้างออเดอร์สำเร็จ และมีการแนบสลิปมาด้วย สามารถยิงอัปโหลดสลิปต่อได้ทันที
-      // (รองรับกรณีสร้างออเดอร์แยกหลาย ID หรือ ID เดี่ยว)
       const createdOrderId = res.data?.data?.createdOrders?.[0] || res.data?.data?.orderId;
 
       if (slipFile && createdOrderId) {

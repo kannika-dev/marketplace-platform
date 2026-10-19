@@ -77,16 +77,16 @@ export const createOrder = async (req, res) => {
 
     const createdOrders = [];
 
-    // 2. วนลูปสร้าง Order แยกตามแต่ละร้านค้าอัตโนมัติ (Split Orders by Seller)
+    // 2. วนลูปสร้าง Order แยกตามแต่ละร้านค้าอัตโนมัติ (Split Orders by Seller) พร้อมบันทึก seller_id ลงตาราง orders
     for (const [sellerId, group] of Object.entries(itemsBySeller)) {
       const overallPaymentType = group.hasDeposit ? 'deposit' : 'full';
 
-      // บันทึก order พร้อมเก็บ seller_id (หากตาราง orders มีคอลัมน์ seller_id) หรือเชื่อมผ่าน items
       const [orderResult] = await connection.query(
-        `INSERT INTO orders (buyer_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        `INSERT INTO orders (buyer_id, seller_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           buyerId,
+          sellerId, // บันทึก seller_id ของร้านค้านี้ลงในตาราง orders
           group.totalAmount,
           'unpaid',
           shipping_address || '',
@@ -146,13 +146,17 @@ export const getMyOrders = async (req, res) => {
   try {
     const buyerId = req.user.id;
 
+    // ดึงออเดอร์พร้อม JOIN ตาราง shops ด้วย seller_id ของตาราง orders โดยตรง
     const [orders] = await pool.query(
-      `SELECT * FROM orders WHERE buyer_id = ? ORDER BY created_at DESC`,
+      `SELECT o.*, s.shop_name 
+       FROM orders o
+       LEFT JOIN shops s ON o.seller_id = s.seller_id
+       WHERE o.buyer_id = ? 
+       ORDER BY o.created_at DESC`,
       [buyerId]
     );
 
     for (const order of orders) {
-      // ดึงสินค้า พร้อมชื่อร้านค้า (shop_name) และ seller_id ของสินค้านั้นๆ
       const [items] = await pool.query(
         `SELECT oi.*, p.title, p.image_url, p.seller_id, s.shop_name 
          FROM order_items oi
@@ -173,8 +177,10 @@ export const getMyOrders = async (req, res) => {
       order.items = items;
       order.timeline = logs;
 
-      // กำหนดชื่อร้านค้าหลักของการ์ดอิศเรศนี้ (ถ้ามีสินค้าจากร้าน ให้ดึงชื่อร้านแรกมาแสดง)
-      order.shop_name = items.length > 0 ? (items[0].shop_name || `ร้านค้า #${items[0].seller_id}`) : 'ร้านค้าแฮนด์เมด';
+      // กำหนดชื่อร้านค้าหลัก
+      if (!order.shop_name) {
+        order.shop_name = items.length > 0 ? (items[0].shop_name || `ร้านค้า #${items[0].seller_id}`) : 'ร้านค้าแฮนด์เมด';
+      }
     }
 
     return res.json({
@@ -195,7 +201,7 @@ export const getBuyerOrders = async (req, res) => {
 };
 
 /**
- * Get specific order details (for buyer or seller involved)[cite: 9]
+ * Get specific order details (for buyer or seller involved)
  */
 export const getOrderById = async (req, res) => {
   try {
@@ -203,7 +209,14 @@ export const getOrderById = async (req, res) => {
     const userId = req.user.id;
     const userRole = req.user.role;
 
-    const [orders] = await pool.query('SELECT * FROM orders WHERE id = ?', [id]);
+    const [orders] = await pool.query(
+      `SELECT o.*, s.shop_name 
+       FROM orders o
+       LEFT JOIN shops s ON o.seller_id = s.seller_id
+       WHERE o.id = ?`,
+      [id]
+    );
+
     if (orders.length === 0) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
@@ -242,7 +255,9 @@ export const getOrderById = async (req, res) => {
 
     order.items = items;
     order.timeline = timeline;
-    order.shop_name = items.length > 0 ? (items[0].shop_name || `ร้านค้า #${items[0].seller_id}`) : 'ร้านค้าแฮนด์เมด';
+    if (!order.shop_name) {
+      order.shop_name = items.length > 0 ? (items[0].shop_name || `ร้านค้า #${items[0].seller_id}`) : 'ร้านค้าแฮนด์เมด';
+    }
 
     return res.json({ success: true, data: order });
   } catch (error) {
@@ -251,7 +266,7 @@ export const getOrderById = async (req, res) => {
 };
 
 /**
- * Upload payment slip for verification (งวดแรก / เต็มจำนวน)[cite: 9]
+ * Upload payment slip for verification (งวดแรก / เต็มจำนวน)
  */
 export const uploadPaymentSlip = async (req, res) => {
   try {
@@ -292,7 +307,7 @@ export const uploadPaymentSlip = async (req, res) => {
 };
 
 /**
- * Upload Final Payment Slip (สลิปงวดที่ 2 สำหรับยอดคงเหลือ)[cite: 9]
+ * Upload Final Payment Slip (สลิปงวดที่ 2 สำหรับยอดคงเหลือ)
  */
 export const uploadFinalPaymentSlip = async (req, res) => {
   try {
