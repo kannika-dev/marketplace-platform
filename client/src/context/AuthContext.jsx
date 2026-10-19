@@ -46,26 +46,48 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
+  // 💡 อัปเดต login: ดึงข้อมูลโปรไฟล์แบบเต็มทันทีหลังเข้าสู่ระบบ เพื่อให้ได้ข้อมูลที่อยู่และเบอร์โทรครบถ้วน
   const login = async (email, password) => {
     const res = await api.post('/auth/login', { email, password });
-    const { token: receivedToken, user: receivedUser } = res.data.data;
+    const { token: receivedToken, user: fallbackUser } = res.data.data;
 
     localStorage.setItem('craft_token', receivedToken);
     api.defaults.headers.common['Authorization'] = `Bearer ${receivedToken}`;
     setToken(receivedToken);
-    setUser(receivedUser);
-    return receivedUser;
+
+    try {
+      const profileRes = await api.get('/auth/profile');
+      if (profileRes.data && profileRes.data.data) {
+        setUser(profileRes.data.data);
+        return profileRes.data.data;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch full profile after login:', err);
+      setUser(fallbackUser);
+    }
+    return fallbackUser;
   };
 
+  // 💡 อัปเดต register: ดึงข้อมูลโปรไฟล์แบบเต็มทันทีหลังสมัครสมาชิก
   const register = async (name, email, password) => {
     const res = await api.post('/auth/register', { name, email, password });
-    const { token: receivedToken, user: receivedUser } = res.data.data;
+    const { token: receivedToken, user: fallbackUser } = res.data.data;
 
     localStorage.setItem('craft_token', receivedToken);
     api.defaults.headers.common['Authorization'] = `Bearer ${receivedToken}`;
     setToken(receivedToken);
-    setUser(receivedUser);
-    return receivedUser;
+
+    try {
+      const profileRes = await api.get('/auth/profile');
+      if (profileRes.data && profileRes.data.data) {
+        setUser(profileRes.data.data);
+        return profileRes.data.data;
+      }
+    } catch (err) {
+      console.warn('Failed to fetch full profile after register:', err);
+      setUser(fallbackUser);
+    }
+    return fallbackUser;
   };
 
   const logout = () => {
