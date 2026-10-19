@@ -101,20 +101,18 @@ function Dashboard() {
       formData.append('image', editImageFile);
     }
 
-    const isMadeToOrderInput = formElement.elements['is_made_to_order'];
-    formData.set('is_made_to_order', isMadeToOrderInput && isMadeToOrderInput.checked ? '1' : '0');
+    // 🔍 อ่านค่า Checkbox สดๆ จากหน้าจอ ณ วินาทีที่กดเซฟ
+    const isMadeToOrderChecked = Boolean(formElement.querySelector('input[name="is_made_to_order"]')?.checked);
+    const isSupportsCustChecked = Boolean(formElement.querySelector('input[name="supports_customization"]')?.checked);
+    const isAllowDepositChecked = Boolean(formElement.querySelector('input[name="allow_deposit"]')?.checked);
 
-    const supportsCustInput = formElement.elements['supports_customization'];
-    formData.set('supports_customization', supportsCustInput && supportsCustInput.checked ? '1' : '0');
-
-    // ✅ บังคับส่งค่า '1' หรือ '0' ตามสถานะ Checkbox อย่างแม่นยำ
-    const allowDepositInput = formElement.elements['allow_deposit'];
-    const isAllowDepositChecked = allowDepositInput ? allowDepositInput.checked : false;
     const allowDepositVal = isAllowDepositChecked ? '1' : '0';
+
+    formData.set('is_made_to_order', isMadeToOrderChecked ? '1' : '0');
+    formData.set('supports_customization', isSupportsCustChecked ? '1' : '0');
     formData.set('allow_deposit', allowDepositVal);
 
-    // 🔍 ปริ้นค่าดูใน Console (F12) เพื่อเช็กสถานะก่อนส่งไป API
-    console.log('🔍 [DEBUG] ค่า allow_deposit ที่กำลังจะส่งไปหลังบ้านคือ:', allowDepositVal);
+    console.log('🔍 [FRONTEND CHECK] ค่า allow_deposit ที่กำลังยิงไปหลังบ้าน:', allowDepositVal);
 
     const stockVal = formData.get('stock_quantity') || '0';
     formData.set('stock_quantity', stockVal);
@@ -122,7 +120,7 @@ function Dashboard() {
 
     try {
       const res = await api.put(`/seller/products/${selectedProduct.id}`, formData);
-      console.log('✅ [DEBUG] บันทึกสำเร็จ Response:', res.data);
+      console.log('✅ [FRONTEND] อัปเดตสำเร็จ Response:', res.data);
       setEditSuccess(res.data?.message || 'อัปเดตสินค้าเรียบร้อยแล้ว!');
       await fetchDashboardData();
 
@@ -132,7 +130,7 @@ function Dashboard() {
         setEditSuccess(null);
       }, 700);
     } catch (err) {
-      console.error('❌ [DEBUG] Update product error:', err);
+      console.error('❌ [FRONTEND] Update product error:', err);
       const errMsg = err.response?.data?.message || err.message || 'เกิดข้อผิดพลาดในการอัปเดตสินค้า';
       setEditError(errMsg);
     } finally {
@@ -647,9 +645,9 @@ function Dashboard() {
         </div>
       )}
 
-      {/* --- MODAL แก้ไขสินค้า --- */}
+      {/* --- MODAL แก้ไขสินค้า (เพิ่ม key บังคับ Reset Form เมื่อสลับสินค้า) --- */}
       {selectedProduct && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div key={selectedProduct.id} className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="text-lg font-bold text-stone-900">แก้ไขรายละเอียดงานคราฟต์</h3>
@@ -745,7 +743,7 @@ function Dashboard() {
                   <input
                     type="checkbox"
                     name="is_made_to_order"
-                    defaultChecked={Boolean(selectedProduct.is_made_to_order)}
+                    defaultChecked={Boolean(Number(selectedProduct.is_made_to_order))}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
                   />
                   <span>สั่งทำตามออเดอร์ (Made-to-order)</span>
@@ -755,13 +753,13 @@ function Dashboard() {
                   <input
                     type="checkbox"
                     name="supports_customization"
-                    defaultChecked={Boolean(selectedProduct.supports_customization)}
+                    defaultChecked={Boolean(Number(selectedProduct.supports_customization))}
                     className="w-4 h-4 text-emerald-800 rounded focus:ring-emerald-800 cursor-pointer"
                   />
                   <span>รองรับการปรับแต่ง (Customization)</span>
                 </label>
 
-                {/* ✅ Checkbox อนุญาตให้มัดจำ 50% ใน Modal แก้ไขสินค้า */}
+                {/* ✅ Checkbox อนุญาตให้มัดจำ 50% ที่แก้ไขตรรกะ defaultChecked ให้ตรงเป๊ะ */}
                 <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-emerald-800">
                   <input
                     type="checkbox"
