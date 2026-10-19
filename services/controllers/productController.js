@@ -151,15 +151,17 @@ export const getSellerProducts = async (req, res) => {
 };
 
 /**
- * Create a new product (รองรับ allow_deposit)
+ * Create a new product (รองรับ allow_deposit แบบแม่นยำ)
  */
 export const createProduct = async (req, res) => {
   try {
-    const sellerId = req.user?.id; // ดึงจาก Token ของร้านค้า
+    const sellerId = req.user?.id;
     const { title, description, price, stock, stock_quantity, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
 
     const finalStock = stock !== undefined ? stock : (stock_quantity !== undefined ? stock_quantity : 1);
-    const depositAllowed = (allow_deposit === '0' || allow_deposit === 0 || allow_deposit === false) ? 0 : 1;
+
+    // ✅ เช็กแบบฟันธง: ถ้าส่ง '1', 1, true มาถึงจะเป็น 1 นอกนั้นตีเป็น 0 ทั้งหมด
+    const depositAllowed = (allow_deposit === '1' || allow_deposit === 1 || allow_deposit === true || allow_deposit === 'true') ? 1 : 0;
 
     const [result] = await pool.query(
       `INSERT INTO products (seller_id, title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit) 
@@ -182,7 +184,7 @@ export const createProduct = async (req, res) => {
 };
 
 /**
- * Update an existing product (รองรับ allow_deposit และ stock_quantity แบบชัวร์ 100%)
+ * Update an existing product (รองรับ allow_deposit แบบฟันธง 100%)
  */
 export const updateProduct = async (req, res) => {
   try {
@@ -191,12 +193,10 @@ export const updateProduct = async (req, res) => {
 
     const finalStock = stock !== undefined ? stock : (stock_quantity !== undefined ? stock_quantity : 0);
 
-    let depositAllowed = 1;
-    if (allow_deposit === 0 || allow_deposit === '0' || allow_deposit === false || allow_deposit === 'false') {
-      depositAllowed = 0;
-    }
+    // ✅ เช็กแบบฟันธง: ถ้าส่ง '1', 1, true มาถึงจะเป็น 1 นอกนั้น (รวมถึง '0', 0, false, undefined) เป็น 0 ทันที
+    const depositAllowed = (allow_deposit === '1' || allow_deposit === 1 || allow_deposit === true || allow_deposit === 'true') ? 1 : 0;
 
-    console.log('>>> [UPDATE] ID:', id, '| allow_deposit ที่รับมา:', allow_deposit, '-> แปลงเป็น:', depositAllowed, '| stock:', finalStock);
+    console.log('>>> [UPDATE] ID:', id, '| allow_deposit ที่รับมา:', allow_deposit, '-> แปลงเป็น:', depositAllowed);
 
     await pool.query(
       `UPDATE products 
@@ -208,7 +208,7 @@ export const updateProduct = async (req, res) => {
         price,
         finalStock,
         category_id,
-        is_made_to_order === 'true' || is_made_to_order === '1' || is_made_to_order === true ? 1 : 0,
+        (is_made_to_order === 'true' || is_made_to_order === '1' || is_made_to_order === true) ? 1 : 0,
         image_url,
         depositAllowed,
         id
