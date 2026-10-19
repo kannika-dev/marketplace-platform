@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
+import axios from 'axios';
 import {
   ShieldCheck,
   CreditCard,
@@ -15,9 +16,7 @@ import {
   Lock,
   Leaf,
   HeartHandshake,
-  MapPin,
-  Phone,
-  AlertCircle
+  Store
 } from 'lucide-react';
 
 export const Checkout = () => {
@@ -25,13 +24,9 @@ export const Checkout = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // รับข้อมูลตะกร้าและยอดเงินที่คำนวณมาจากหน้า Cart (ถ้าไม่มีให้ fallback ใช้ cart จาก context)
   const { cart: contextCart } = useAuth();
   const cartItems = location.state?.cartItems || contextCart;
-  const passedDueNow = location.state?.dueNow;
-  const passedRemainingBalance = location.state?.remaining_balance;
 
-  // Accordion active step (1: Address, 2: Payment, 3: Review)
   const [currentStep, setCurrentStep] = useState(1);
 
   // Form states
@@ -43,6 +38,11 @@ export const Checkout = () => {
   const [province, setProvince] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [note, setNote] = useState('');
+
+  // เก็บข้อมูลร้านค้าแยกตาม seller_id
+  const [shopsMap, setShopsMap] = useState({});
+  const [paymentMethods, setPaymentMethods] = useState({}); // { [sellerId]: 'bank_transfer' | 'promptpay' | 'credit_card' }
+  const [copiedStates, setCopiedStates] = useState({});
 
   useEffect(() => {
     if (user) {
@@ -56,41 +56,85 @@ export const Checkout = () => {
     }
   }, [user]);
 
-  // Payment Method ('bank_transfer' | 'promptpay' | 'credit_card')
-  const [paymentMethod, setPaymentMethod] = useState('bank_transfer');
-  const [copied, setCopied] = useState(false);
-  const [cardNumber, setCardNumber] = useState('•••• •••• •••• 4242');
+  // จัดกลุ่มสินค้าตาม seller_id
+  const groupedBySeller = cartItems.reduce((acc, item) => {
+    const sId = item.seller_id || item.artisan_id || 1;
+    if (!acc[sId]) {
+      acc[sId] = {
+        sellerName: item.store_name || item.artisan_name || `ร้านค้า #${sId}`,
+        items: []
+      };
+    }
+    acc[sId].items.push(item);
+    return acc;
+  }, {});
 
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  // ดึงข้อมูลร้านค้าทั้งหมดที่อยู่ในตะกร้าจาก Backend
+  useEffect(() => {
+    const fetchAllShops = async () => {
+      const sellerIds = Object.keys(groupedBySeller);
+      const newShopsMap = {};
+      const initialPayments = {};
 
-  // คำนวณยอดรวมทั้งหมดและยอดที่ต้องจ่ายตอนนี้จากสินค้าในตะกร้าที่เลือกประเภทการจ่ายมาแล้ว
+      for (const sId of sellerIds) {
+        try {
+          const res = await axios.get(`/api/shops/seller/${sId}`);
+          if (res.data && res.data.success) {
+            newShopsMap[sId] = res.data.data;
+          }
+        } catch (err) {
+          console.error(`Error fetching shop info for seller ${sId}:`, err);
+          // Fallback ถ้าดึงไม่ได้
+          newShopsMap[sId] = {
+            bank_name: 'ธนาคารกรุงเทพ (BBL)',
+            bank_account: '644-0-699665',
+            account_name: 'กรรณิการ์ เหลือดี',
+            promptpay_number: '0839353986',
+            qr_code_url: ''
+          };
+        }
+        initialPayments[sId] = 'bank_transfer';
+      }
+
+      setShopsMap(newShopsMap);
+      setPaymentMethods(initialPayments);
+    };
+
+    if (cartItems.length > 0) {
+      fetchAllShops();
+    }
+  }, [cartItems]);
+
+  const handlePaymentMethodChange = (sellerId, method) => {
+    setPaymentMethods(prev => ({ ...prev, [sellerId]: method }));
+  };
+
+  const copyBankNumber = (sellerId, accountNo) => {
+    navigator.clipboard.writeText(accountNo);
+    setCopiedStates(prev => ({ ...prev, [sellerId]: true }));
+    setTimeout(() => {
+      setCopiedStates(prev => ({ ...prev, [sellerId]: false }));
+    }, 2000);
+  };
+
+  // คำนวณยอดรวมทั้งหมดของตะกร้า
   const totalFullPrice = cartItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
 
-  // คำนวณยอด Due Now และ Remaining Balance ตามที่ลูกค้าเลือกรายชิ้นไว้
-  let calculatedDueNow = 0;
-  let calculatedRemaining = 0;
+  // คำนวณยอดภาพรวม
+  let totalDueNow = 0;
+  let totalRemaining = 0;
   let hasAnyDeposit = false;
 
   cartItems.forEach(item => {
     const itemTotal = Number(item.price) * item.quantity;
     if (item.chosen_payment_type === 'deposit') {
-      calculatedDueNow += itemTotal / 2;
-      calculatedRemaining += (itemTotal - itemTotal / 2);
+      totalDueNow += itemTotal / 2;
+      totalRemaining += (itemTotal - itemTotal / 2);
       hasAnyDeposit = true;
     } else {
-      calculatedDueNow += itemTotal;
+      totalDueNow += itemTotal;
     }
   });
-
-  const dueNow = passedDueNow !== undefined ? passedDueNow : calculatedDueNow;
-  const remainingBalance = passedRemainingBalance !== undefined ? passedRemainingBalance : calculatedRemaining;
-
-  const copyBankNumber = () => {
-    navigator.clipboard.writeText('0982345678');
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   if (!cartItems || cartItems.length === 0) {
     return (
@@ -117,24 +161,22 @@ export const Checkout = () => {
     try {
       const fullAddressPayload = `${receiverName} (โทร: ${phoneNumber})\nบ้านเลขที่/ซอย: ${addressNo}\nตำบล/แขวง: ${subdistrict} อ.เภอ/เขต: ${district}\nจ. ${province} รหัสไปรษณีย์ ${postalCode}`;
 
+      // ส่งข้อมูลไปสร้างออเดอร์แยกตามร้านค้า (Backend ของเราจะจัดการแยก Order ให้เอง)
       const orderPayload = {
         shipping_address: fullAddressPayload,
         note: `[รูปแบบการชำระเงิน: ${hasAnyDeposit ? 'ผสมผสาน (มีรายการมัดจำ)' : 'ชำระเต็มจำนวน'}] ${note}`,
-        payment_type: hasAnyDeposit ? 'deposit' : 'full',
-        payment_method: paymentMethod,
-        deposit_amount: dueNow,
-        remaining_balance: remainingBalance,
+        payment_method: Object.values(paymentMethods)[0] || 'bank_transfer',
         items: cartItems.map((item) => ({
           product_id: item.id || item.product_id,
           quantity: Number(item.quantity) || 1,
-          payment_type: item.chosen_payment_type || 'full', // ส่งประเภทการจ่ายแยกตามรายชิ้น
+          payment_type: item.chosen_payment_type || 'full',
           customization_notes: item.selectedOptions ? JSON.stringify(item.selectedOptions) : (item.customization_notes || null)
         }))
       };
 
       await createOrder(orderPayload);
       clearCart();
-      alert(`✨ สร้างคำสั่งซื้อสำเร็จ! กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);
+      alert(`✨ สร้างคำสั่งซื้อแยกตามร้านค้าสำเร็จ! กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);
       navigate('/buyer-dashboard?tab=tracker');
     } catch (err) {
       console.error('Place order error:', err);
@@ -146,8 +188,6 @@ export const Checkout = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-
-      {/* Header */}
       <div>
         <Link
           to="/cart"
@@ -172,13 +212,9 @@ export const Checkout = () => {
         </div>
       )}
 
-      {/* 2-Column Split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
-        {/* LEFT COLUMN: 3-Step Visual Accordion */}
         <div className="lg:col-span-8 space-y-5">
-
-          {/* STEP 1: Shipping Address */}
+          {/* STEP 1: Address */}
           <div className={`clay-card rounded-3xl border transition-all overflow-hidden ${currentStep === 1 ? 'border-[#2A9D8F] ring-2 ring-[#2A9D8F]/20' : 'border-white'}`}>
             <button
               type="button"
@@ -310,7 +346,7 @@ export const Checkout = () => {
             )}
           </div>
 
-          {/* STEP 2: Payment Method */}
+          {/* STEP 2: Payment Method (แสดงแยกตามร้านค้า) */}
           <div className={`clay-card rounded-3xl border transition-all overflow-hidden ${currentStep === 2 ? 'border-[#2A9D8F] ring-2 ring-[#2A9D8F]/20' : 'border-white'}`}>
             <button
               type="button"
@@ -318,15 +354,15 @@ export const Checkout = () => {
               className="w-full p-5 sm:p-6 text-left flex items-center justify-between bg-white/60 hover:bg-white/95 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3.5">
-                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm ${paymentMethod ? 'btn-3d-botanical text-white' : 'bg-stone-100 text-stone-600'}`}>
+                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center font-bold text-sm ${currentStep === 2 ? 'btn-3d-botanical text-white' : 'bg-stone-100 text-stone-600'}`}>
                   2
                 </div>
                 <div>
                   <h3 className="text-base font-display font-bold text-stone-900">
-                    ช่องทางการชำระเงิน (Payment Method)
+                    ช่องทางการชำระเงินแยกตามร้านค้า (Payment Method per Shop)
                   </h3>
                   <p className="text-xs text-stone-500 font-normal">
-                    {paymentMethod === 'bank_transfer' ? 'โอนผ่านธนาคาร' : paymentMethod === 'promptpay' ? 'พร้อมเพย์' : 'บัตรเครดิต'} • ยอดชำระงวดนี้: ฿{dueNow.toLocaleString()}
+                    สินค้าในตะกร้ามาจาก {Object.keys(groupedBySeller).length} ร้านค้า • ชำระเงินแยกตามบัญชีของแต่ละร้าน
                   </p>
                 </div>
               </div>
@@ -334,118 +370,114 @@ export const Checkout = () => {
             </button>
 
             {currentStep === 2 && (
-              <div className="p-6 sm:p-8 pt-2 border-t border-emerald-100/60 space-y-6 bg-white/40">
-
+              <div className="p-6 sm:p-8 pt-2 border-t border-emerald-100/60 space-y-8 bg-white/40">
                 <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-[#1B4332] flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-[#2A9D8F] shrink-0" />
-                  <span>รูปแบบการชำระเงิน (จ่ายเต็ม/มัดจำ) ถูกกำหนดตามที่คุณเลือกไว้ในหน้าตะกร้าสินค้าเรียบร้อยแล้ว</span>
+                  <span>ระบบจะทำการแยกคำสั่งซื้อ (Split Order) ตามร้านค้าอัตโนมัติ กรุณาตรวจสอบช่องทางชำระเงินของแต่ละร้านด้านล่างนี้ค่ะ</span>
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-stone-800 block">เลือกช่องทางชำระเงิน *</label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                    <div
-                      onClick={() => setPaymentMethod('bank_transfer')}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${paymentMethod === 'bank_transfer' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/50'}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-xl bg-white text-[#2A9D8F] flex items-center justify-center font-bold">
-                          <CreditCard className="w-4 h-4" />
+                {/* วนลูปแสดงช่องทางการชำระเงินแยกตามแต่ละร้าน */}
+                {Object.entries(groupedBySeller).map(([sellerId, group]) => {
+                  const shop = shopsMap[sellerId] || {};
+                  const currentMethod = paymentMethods[sellerId] || 'bank_transfer';
+
+                  // คำนวณยอดเฉพาะของร้านนี้
+                  const shopDueNow = group.items.reduce((sum, item) => {
+                    const itemTotal = Number(item.price) * item.quantity;
+                    return sum + (item.chosen_payment_type === 'deposit' ? itemTotal / 2 : itemTotal);
+                  }, 0);
+
+                  return (
+                    <div key={sellerId} className="p-5 rounded-3xl bg-white border border-emerald-100 shadow-sm space-y-4">
+                      <div className="flex items-center gap-2 pb-3 border-b border-emerald-50">
+                        <Store className="w-4 h-4 text-[#2A9D8F]" />
+                        <h4 className="text-sm font-display font-bold text-stone-900">{group.sellerName}</h4>
+                        <span className="ml-auto text-xs font-bold text-[#E76F51]">ยอดชำระร้านนี้: ฿{shopDueNow.toLocaleString()}</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div
+                          onClick={() => handlePaymentMethodChange(sellerId, 'bank_transfer')}
+                          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${currentMethod === 'bank_transfer' ? 'border-[#2A9D8F] bg-[#E8F7F3]' : 'border-emerald-100 bg-white'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <CreditCard className="w-4 h-4 text-[#2A9D8F]" />
+                            {currentMethod === 'bank_transfer' && <CheckCircle2 className="w-4 h-4 text-[#2A9D8F]" />}
+                          </div>
+                          <span className="text-xs font-bold text-stone-900">โอนผ่านธนาคาร</span>
                         </div>
-                        {paymentMethod === 'bank_transfer' && <CheckCircle2 className="w-4 h-4 text-[#2A9D8F]" />}
-                      </div>
-                      <div>
-                        <span className="text-xs font-display font-bold text-stone-900 block">โอนผ่านธนาคาร</span>
-                        <span className="text-[10px] text-stone-500">KBANK / SCB / BBL</span>
-                      </div>
-                    </div>
 
-                    <div
-                      onClick={() => setPaymentMethod('promptpay')}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${paymentMethod === 'promptpay' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/50'}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-xl bg-white text-[#2A9D8F] flex items-center justify-center font-bold">
-                          <QrCode className="w-4 h-4" />
+                        <div
+                          onClick={() => handlePaymentMethodChange(sellerId, 'promptpay')}
+                          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${currentMethod === 'promptpay' ? 'border-[#2A9D8F] bg-[#E8F7F3]' : 'border-emerald-100 bg-white'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <QrCode className="w-4 h-4 text-[#2A9D8F]" />
+                            {currentMethod === 'promptpay' && <CheckCircle2 className="w-4 h-4 text-[#2A9D8F]" />}
+                          </div>
+                          <span className="text-xs font-bold text-stone-900">พร้อมเพย์ QR Code</span>
                         </div>
-                        {paymentMethod === 'promptpay' && <CheckCircle2 className="w-4 h-4 text-[#2A9D8F]" />}
-                      </div>
-                      <div>
-                        <span className="text-xs font-display font-bold text-stone-900 block">พร้อมเพย์ QR Code</span>
-                        <span className="text-[10px] text-stone-500">สแกนจ่ายได้ทุกแอป</span>
-                      </div>
-                    </div>
 
-                    <div
-                      onClick={() => setPaymentMethod('credit_card')}
-                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${paymentMethod === 'credit_card' ? 'border-[#2A9D8F] bg-[#E8F7F3] shadow-sm' : 'border-emerald-100 bg-white hover:border-[#2A9D8F]/50'}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-xl bg-white text-[#2A9D8F] flex items-center justify-center font-bold">
-                          <Lock className="w-4 h-4" />
+                        <div
+                          onClick={() => handlePaymentMethodChange(sellerId, 'credit_card')}
+                          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between space-y-2 ${currentMethod === 'credit_card' ? 'border-[#2A9D8F] bg-[#E8F7F3]' : 'border-emerald-100 bg-white'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <Lock className="w-4 h-4 text-[#2A9D8F]" />
+                            {currentMethod === 'credit_card' && <CheckCircle2 className="w-4 h-4 text-[#2A9D8F]" />}
+                          </div>
+                          <span className="text-xs font-bold text-stone-900">บัตรเครดิต</span>
                         </div>
-                        {paymentMethod === 'credit_card' && <CheckCircle2 className="w-4 h-4 text-[#2A9D8F]" />}
                       </div>
-                      <div>
-                        <span className="text-xs font-display font-bold text-stone-900 block">บัตรเครดิต / เดบิต</span>
-                        <span className="text-[10px] text-stone-500">Visa / Mastercard</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
 
-                {paymentMethod === 'bank_transfer' && (
-                  <div className="p-5 bg-gradient-to-r from-[#FFF9EC] to-[#FFE6A7]/40 rounded-2xl border border-[#FFE6A7] text-xs space-y-2.5">
-                    <p className="font-bold text-[#9E6E00]">บัญชีธนาคารกลางสำหรับแพลตฟอร์ม Craftiverse</p>
-                    <p className="text-stone-700 font-medium">ธนาคารกสิกรไทย (KBANK)</p>
-                    <div className="flex items-center gap-3">
-                      <span className="font-mono text-base font-extrabold text-stone-900 bg-white px-3 py-1.5 rounded-xl border border-amber-200">
-                        098-2-34567-8
-                      </span>
-                      <button
-                        type="button"
-                        onClick={copyBankNumber}
-                        className="px-3 py-1.5 bg-white text-stone-700 hover:text-[#2A9D8F] rounded-xl border border-amber-200 font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copied ? 'คัดลอกแล้ว' : 'คัดลอกเลขบัญชี'}</span>
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-stone-500">
-                      * ยอดที่ต้องโอนตอนนี้ (Due Now): <strong className="text-[#E76F51]">฿{dueNow.toLocaleString()}</strong>
-                    </p>
-                  </div>
-                )}
+                      {/* รายละเอียดบัญชีธนาคารของร้านนี้ */}
+                      {currentMethod === 'bank_transfer' && (
+                        <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 text-xs space-y-2">
+                          <p className="font-bold text-amber-900">บัญชีธนาคารของ {group.sellerName}</p>
+                          <p className="text-stone-700 font-medium">{shop.bank_name || 'ไม่ระบุธนาคาร'}</p>
+                          <div className="flex items-center gap-3">
+                            <span className="font-mono text-base font-extrabold text-stone-900 bg-white px-3 py-1 rounded-xl border border-amber-200">
+                              {shop.bank_account || '000-0-00000-0'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => copyBankNumber(sellerId, shop.bank_account)}
+                              className="px-3 py-1 bg-white text-stone-700 hover:text-[#2A9D8F] rounded-xl border border-amber-200 font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedStates[sellerId] ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{copiedStates[sellerId] ? 'คัดลอกแล้ว' : 'คัดลอกเลขบัญชี'}</span>
+                            </button>
+                          </div>
+                          <p className="text-stone-600">ชื่อบัญชี: {shop.account_name || '-'}</p>
+                          <p className="text-[11px] text-[#E76F51] font-bold">
+                            * ยอดโอนร้านนี้: ฿{shopDueNow.toLocaleString()}
+                          </p>
+                        </div>
+                      )}
 
-                {paymentMethod === 'promptpay' && (
-                  <div className="p-5 bg-white rounded-2xl border border-emerald-200 text-xs space-y-3 flex flex-col sm:flex-row items-center gap-4">
-                    <div className="w-28 h-28 bg-[#E8F7F3] rounded-2xl border border-[#A2D9D2] flex items-center justify-center p-2 shrink-0">
-                      <QrCode className="w-20 h-20 text-[#2A9D8F]" />
+                      {/* รายละเอียดพร้อมเพย์และ QR Code ของร้านนี้ พร้อมกำกับยอดเงิน */}
+                      {currentMethod === 'promptpay' && (
+                        <div className="p-4 bg-white rounded-2xl border border-emerald-200 text-xs space-y-3 flex flex-col sm:flex-row items-center gap-4">
+                          <div className="w-28 h-28 bg-[#E8F7F3] rounded-2xl border border-[#A2D9D2] flex items-center justify-center p-2 shrink-0">
+                            {shop.qr_code_url ? (
+                              <img src={shop.qr_code_url} alt="PromptPay QR" className="w-full h-full object-cover rounded-xl" />
+                            ) : (
+                              <QrCode className="w-16 h-16 text-[#2A9D8F]" />
+                            )}
+                          </div>
+                          <div className="space-y-1 text-center sm:text-left">
+                            <span className="text-[11px] font-bold text-[#2A9D8F] bg-[#E8F7F3] px-2 py-0.5 rounded-md">
+                              พร้อมเพย์: {shop.promptpay_number || 'ไม่ระบุ'}
+                            </span>
+                            <h4 className="text-xs font-bold text-stone-900">สแกน QR เพื่อจ่ายยอดร้านนี้</h4>
+                            <p className="text-sm font-extrabold text-[#E76F51]">฿{shopDueNow.toLocaleString()}</p>
+                            <p className="text-[10px] text-stone-400">* กรุณาโอนให้ตรงกับยอดชำระของร้านนี้เท่านั้น</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-1 text-center sm:text-left">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-[#2A9D8F] bg-[#E8F7F3] px-2 py-0.5 rounded-md">
-                        PromptPay Real-time
-                      </span>
-                      <h4 className="text-sm font-display font-bold text-stone-900">
-                        สแกน QR Code เพื่อชำระยอด ฿{dueNow.toLocaleString()}
-                      </h4>
-                    </div>
-                  </div>
-                )}
-
-                {paymentMethod === 'credit_card' && (
-                  <div className="p-5 bg-white rounded-2xl border border-emerald-200 space-y-3">
-                    <div>
-                      <label className="text-xs font-bold text-stone-700 block mb-1">หมายเลขบัตรเครดิต</label>
-                      <input
-                        type="text"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        className="w-full text-xs p-3 bg-stone-50 border border-emerald-200 rounded-xl font-mono focus:outline-none focus:border-[#2A9D8F]"
-                      />
-                    </div>
-                  </div>
-                )}
+                  );
+                })}
 
                 <div className="pt-2 flex justify-end">
                   <button
@@ -457,12 +489,11 @@ export const Checkout = () => {
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
-
               </div>
             )}
           </div>
 
-          {/* STEP 3: Review & Final Confirmation */}
+          {/* STEP 3: Review */}
           <div className={`clay-card rounded-3xl border transition-all overflow-hidden ${currentStep === 3 ? 'border-[#2A9D8F] ring-2 ring-[#2A9D8F]/20' : 'border-white'}`}>
             <button
               type="button"
@@ -490,10 +521,10 @@ export const Checkout = () => {
                 <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 text-xs space-y-2 text-stone-700">
                   <div className="flex items-center gap-2 text-[#2A9D8F] font-bold">
                     <HeartHandshake className="w-4 h-4" />
-                    <span>เงื่อนไขงาน Made-to-Order และการติดตามสินค้า</span>
+                    <span>เงื่อนไขการแยกคำสั่งซื้อตามร้านค้า</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-stone-600">
-                    เมื่อกดยืนยันคำสั่งซื้อแล้ว ระบบจะนำคุณไปยังหน้า <strong>"ติดตามสินค้า (Craft Tracker)"</strong> ทันทีค่ะ
+                    ระบบจะสร้างออเดอร์แยกตามแต่ละร้านค้าให้โดยอัตโนมัติ คุณสามารถติดตามสถานะงานได้ในหน้า <strong>"Craft Tracker"</strong>
                   </p>
                 </div>
 
@@ -504,17 +535,16 @@ export const Checkout = () => {
                     disabled={submitting}
                     className="w-full sm:w-auto px-10 py-4 btn-3d-peach text-sm font-bold rounded-2xl shadow-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>{submitting ? 'กำลังส่งคำสั่งซื้อ...' : 'ยืนยันและส่งคำสั่งซื้อทันที'}</span>
+                    <span>{submitting ? 'กำลังสร้างออเดอร์แยกตามร้าน...' : 'ยืนยันและส่งคำสั่งซื้อทันที'}</span>
                     <Sparkles className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             )}
           </div>
-
         </div>
 
-        {/* RIGHT COLUMN: Sticky Invoice Preview Card */}
+        {/* RIGHT COLUMN: Invoice Preview */}
         <div className="lg:col-span-4 sticky top-24 space-y-4">
           <div className="clay-card p-6 sm:p-7 rounded-3xl border border-white shadow-xl space-y-5 bg-white/95 backdrop-blur-md">
             <div className="border-b border-emerald-100 pb-3">
@@ -551,10 +581,10 @@ export const Checkout = () => {
                 <span className="font-bold text-stone-800">฿{totalFullPrice.toLocaleString()}</span>
               </div>
 
-              {remainingBalance > 0 && (
+              {totalRemaining > 0 && (
                 <div className="flex justify-between text-amber-600">
-                  <span>ยอดค้างชำระงวดสอง</span>
-                  <span className="font-bold">฿{remainingBalance.toLocaleString()}</span>
+                  <span>ยอดค้างชำระงวดสองรวม</span>
+                  <span className="font-bold">฿{totalRemaining.toLocaleString()}</span>
                 </div>
               )}
 
@@ -564,7 +594,7 @@ export const Checkout = () => {
                   <span className="text-[10px] text-stone-400 block">(Due Now)</span>
                 </div>
                 <span className="text-[#E76F51] text-2xl font-display font-extrabold">
-                  ฿{dueNow.toLocaleString()}
+                  ฿{totalDueNow.toLocaleString()}
                 </span>
               </div>
             </div>
@@ -580,9 +610,7 @@ export const Checkout = () => {
             </div>
           </div>
         </div>
-
       </div>
-
     </div>
   );
 };

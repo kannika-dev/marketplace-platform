@@ -2,7 +2,7 @@ import pool from '../config/db.js';
 import { getSecureCloudinaryUrl } from '../middleware/uploadMiddleware.js';
 
 /**
- * Create a new order with items and initial craft tracker state (Supporting per-item payment selection)
+ * Create new orders with items (Supports splitting orders automatically by seller and per-item payment selection)
  */
 export const createOrder = async (req, res) => {
   const connection = await pool.getConnection();
@@ -19,11 +19,8 @@ export const createOrder = async (req, res) => {
 
     await connection.beginTransaction();
 
-    let totalAmount = 0;
-    let calculatedDeposit = 0;
-    let calculatedRemaining = 0;
-    let hasAnyDeposit = false;
-    const calculatedItems = [];
+    // 1. จัดกลุ่มสินค้าตาม seller_id ของแต่ละร้านค้า
+    const itemsBySeller = {};
 
     for (const item of items) {
       const [productRows] = await connection.query(
@@ -36,11 +33,10 @@ export const createOrder = async (req, res) => {
       }
 
       const prod = productRows[0];
+      const sellerId = prod.seller_id || 1;
       const quantity = Math.max(1, Number(item.quantity) || 1);
       const itemTotal = Number(prod.price) * quantity;
-      totalAmount += itemTotal;
 
-      // ตรวจสอบประเภทการชำระเงินรายชิ้นที่ส่งมาจากหน้าตะกร้า/Checkout
       const itemPaymentType = item.payment_type || 'full';
       const isAllowed = prod.allow_deposit === 1 || prod.allow_deposit === true;
 
@@ -50,13 +46,26 @@ export const createOrder = async (req, res) => {
       if (itemPaymentType === 'deposit' && isAllowed) {
         itemDueNow = itemTotal / 2;
         itemRemaining = itemTotal - itemDueNow;
-        hasAnyDeposit = true;
       }
 
-      calculatedDeposit += itemDueNow;
-      calculatedRemaining += itemRemaining;
+      if (!itemsBySeller[sellerId]) {
+        itemsBySeller[sellerId] = {
+          totalAmount: 0,
+          depositAmount: 0,
+          remainingBalance: 0,
+          hasDeposit: false,
+          items: []
+        };
+      }
 
-      calculatedItems.push({
+      itemsBySeller[sellerId].totalAmount += itemTotal;
+      itemsBySeller[sellerId].depositAmount += itemDueNow;
+      itemsBySeller[sellerId].remainingBalance += itemRemaining;
+      if (itemPaymentType === 'deposit' && isAllowed) {
+        itemsBySeller[sellerId].hasDeposit = true;
+      }
+
+      itemsBySeller[sellerId].items.push({
         product_id: prod.id,
         price: prod.price,
         quantity,
@@ -65,54 +74,54 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    const overallPaymentType = hasAnyDeposit ? 'deposit' : 'full';
+    const createdOrders = [];
 
-    // Insert order master
-    const [orderResult] = await connection.query(
-      `INSERT INTO orders (buyer_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        buyerId,
-        totalAmount,
-        'unpaid',
-        shipping_address || '',
-        overallPaymentType,
-        payment_method || 'bank_transfer',
-        calculatedDeposit,
-        calculatedRemaining
-      ]
-    );
+    // 2. วนลูปสร้าง Order แยกตามแต่ละร้านค้าอัตโนมัติ (Split Orders by Seller)
+    for (const [sellerId, group] of Object.entries(itemsBySeller)) {
+      const overallPaymentType = group.hasDeposit ? 'deposit' : 'full';
 
-    const orderId = orderResult.insertId;
+      const [orderResult] = await connection.query(
+        `INSERT INTO orders (buyer_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          buyerId,
+          group.totalAmount,
+          'unpaid',
+          shipping_address || '',
+          overallPaymentType,
+          payment_method || 'bank_transfer',
+          group.depositAmount,
+          group.remainingBalance
+        ]
+      );
 
-    // Insert order items พร้อมบันทึก payment_type แยกตามรายชิ้น
-    for (const it of calculatedItems) {
+      const orderId = orderResult.insertId;
+      createdOrders.push(orderId);
+
+      // 3. บันทึก order_items สำหรับร้านค้านี้
+      for (const it of group.items) {
+        await connection.query(
+          `INSERT INTO order_items (order_id, product_id, quantity, price, payment_type, customization_notes)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [orderId, it.product_id, it.quantity, it.price, it.payment_type, it.customization_notes]
+        );
+      }
+
+      // 4. บันทึก Timeline เริ่มต้นใน craft_tracking_logs[cite: 9]
       await connection.query(
-        `INSERT INTO order_items (order_id, product_id, quantity, price, payment_type, customization_notes)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [orderId, it.product_id, it.quantity, it.price, it.payment_type, it.customization_notes]
+        `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
+         VALUES (?, 'order_placed', 'คำสั่งซื้อถูกส่งเรียบร้อย', 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
+        [orderId]
       );
     }
-
-    // Insert initial craft timeline log
-    await connection.query(
-      `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
-       VALUES (?, 'order_placed', 'คำสั่งซื้อถูกส่งเรียบร้อย', 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
-      [orderId]
-    );
 
     await connection.commit();
 
     return res.status(201).json({
       success: true,
-      message: 'Order created successfully.',
+      message: 'Orders created and split successfully by seller.',
       data: {
-        orderId,
-        totalAmount,
-        payment_type: overallPaymentType,
-        deposit_amount: calculatedDeposit,
-        remaining_balance: calculatedRemaining,
-        status: 'unpaid'
+        createdOrders
       }
     });
   } catch (error) {
@@ -149,7 +158,6 @@ export const getMyOrders = async (req, res) => {
         [order.id]
       );
 
-      // ดึงประวัติไทม์ไลน์ทั้งหมด พร้อมระบุฟิลด์ image_url และ notes ให้ตรงกับฐานข้อมูลจริง[cite: 9]
       const [logs] = await pool.query(
         `SELECT id, order_id, step, status_title, notes, image_url, created_at 
          FROM craft_tracking_logs 
@@ -195,7 +203,6 @@ export const getOrderById = async (req, res) => {
 
     const order = orders[0];
 
-    // Authorization check
     if (userRole !== 'admin' && order.buyer_id !== userId) {
       const [sellerItems] = await pool.query(
         `SELECT oi.id 
@@ -259,7 +266,6 @@ export const uploadPaymentSlip = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found or unauthorized.' });
     }
 
-    // Add tracking event
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
        VALUES (?, 'payment_uploaded', 'ส่งหลักฐานการชำระเงินแล้ว', 'รอเจ้าหน้าที่แอดมินหรือร้านค้าตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
@@ -301,7 +307,6 @@ export const uploadFinalPaymentSlip = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found or unauthorized.' });
     }
 
-    // Add tracking event log
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
        VALUES (?, 'final_payment_verification', 'แนบหลักฐานการชำระเงินงวดที่ 2 แล้ว', 'รอร้านค้าตรวจสอบสลิปยอดคงเหลือ', ?, NOW())`,
@@ -339,13 +344,11 @@ export const confirmReceivedOrder = async (req, res) => {
 
     await connection.beginTransaction();
 
-    // อัปเดตสถานะออเดอร์เป็น completed
     await connection.query(
       `UPDATE orders SET craft_status = 'completed', status = 'completed' WHERE id = ?`,
       [id]
     );
 
-    // บันทึกประวัติลงใน Timeline (craft_tracking_logs)
     await connection.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
        VALUES (?, 'completed', '🎉 ผู้ซื้อยืนยันได้รับสินค้าเรียบร้อยแล้ว', 'คำสั่งซื้อเสร็จสมบูรณ์ ลูกค้าได้รับสินค้าเป็นที่เรียบร้อย', NULL, NOW())`,
