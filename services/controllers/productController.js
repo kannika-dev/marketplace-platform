@@ -185,10 +185,16 @@ export const createProduct = async (req, res) => {
  */
 export const updateProduct = async (req, res) => {
   try {
+    // 🔍 แอบส่องค่าที่ส่งมาจากหน้าบ้านตรงนี้
+    console.log('>>> 🟢 RAW REQ.BODY:', req.body);
+    console.log('>>> 🟢 allow_deposit ที่ได้รับ:', req.body.allow_deposit, typeof req.body.allow_deposit);
+
     const { id } = req.params;
     const { title, description, price, stock, category_id, is_made_to_order, image_url, allow_deposit } = req.body;
 
     const depositAllowed = (allow_deposit === '0' || allow_deposit === 0 || allow_deposit === false) ? 0 : 1;
+
+    console.log('>>> 🟢 แปลงค่าเป็น depositAllowed ได้:', depositAllowed);
 
     await pool.query(
       `UPDATE products 
