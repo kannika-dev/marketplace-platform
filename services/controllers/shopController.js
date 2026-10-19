@@ -54,6 +54,7 @@ export const getSellerAnalytics = async (req, res) => {
         );
 
         res.json({
+            success: true,
             totalRevenue: Number(salesStats[0].total_revenue),
             totalOrders: Number(salesStats[0].total_orders),
             avgRating: Number(Number(reviewStats[0].avg_rating).toFixed(1)),
@@ -64,22 +65,31 @@ export const getSellerAnalytics = async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching seller analytics:', error);
-        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูล Analytics' });
+        res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการดึงข้อมูล Analytics' });
     }
 };
 
-// ดึงข้อมูลร้านค้าตาม sellerId
+// ดึงข้อมูลร้านค้าตาม sellerId (ปรับส่งแบบมาตรฐาน { success: true, data: ... })
 export const getShopBySellerId = async (req, res) => {
     const { sellerId } = req.params;
     try {
         const [shops] = await pool.query('SELECT * FROM shops WHERE seller_id = ?', [sellerId]);
         if (shops.length === 0) {
-            return res.status(404).json({ message: 'ไม่พบข้อมูลร้านค้า' });
+            return res.status(404).json({
+                success: false,
+                message: 'ไม่พบข้อมูลร้านค้า'
+            });
         }
-        res.json(shops[0]);
+        res.json({
+            success: true,
+            data: shops[0]
+        });
     } catch (error) {
         console.error('Error fetching shop:', error);
-        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลร้านค้า' });
+        res.status(500).json({
+            success: false,
+            message: 'เกิดข้อผิดพลาดในการดึงข้อมูลร้านค้า: ' + error.message
+        });
     }
 };
 
@@ -99,9 +109,6 @@ export const updateShopProfile = async (req, res) => {
         } = req.body;
 
         // จัดการ Logo URL:
-        // ถ้ามีไฟล์ใหม่ -> ใช้ Cloudinary HTTPS URL
-        // ถ้าไม่มีไฟล์ใหม่ แต่ส่ง URL ที่ไม่ใช่ค่าว่างมา -> ใช้ URL นั้น
-        // ถ้าไม่ส่งมา หรือเป็นค่าว่าง -> คงค่าเดิมใน DB ไว้ ห้ามทับด้วย null
         let finalLogoUrl = existing ? existing.logo_url : null;
         if (req.files && req.files.logo && req.files.logo[0]) {
             finalLogoUrl = getSecureCloudinaryUrl(req.files.logo[0]);

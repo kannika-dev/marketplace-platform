@@ -22,7 +22,9 @@ export const BuyerDashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const tabFromUrl = searchParams.get('tab');
 
-    const [activeTab, setActiveTab] = useState(tabFromUrl || 'profile');
+    // 👈 ปรับให้รองรับทั้ง tracking และ tracker เพื่อป้องกันลิงก์ตีกัน
+    const initialTab = tabFromUrl === 'tracker' ? 'tracking' : (tabFromUrl || 'profile');
+    const [activeTab, setActiveTab] = useState(initialTab);
     const [refreshKey, setRefreshKey] = useState(0);
 
     const [buyerProfile, setBuyerProfile] = useState({
@@ -36,7 +38,7 @@ export const BuyerDashboard = () => {
     // อัปเดต Tab เมื่อเปลี่ยน Query Parameter ใน URL
     useEffect(() => {
         if (tabFromUrl) {
-            setActiveTab(tabFromUrl);
+            setActiveTab(tabFromUrl === 'tracker' ? 'tracking' : tabFromUrl);
         }
     }, [tabFromUrl]);
 

@@ -16,7 +16,9 @@ import {
   Lock,
   Leaf,
   HeartHandshake,
-  Store
+  Store,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export const Checkout = () => {
@@ -39,9 +41,16 @@ export const Checkout = () => {
   const [postalCode, setPostalCode] = useState('');
   const [note, setNote] = useState('');
 
+  // Slip upload state
+  const [slipFile, setSlipFile] = useState(null);
+  const [slipPreview, setSlipPreview] = useState(null);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
   // เก็บข้อมูลร้านค้าแยกตาม seller_id
   const [shopsMap, setShopsMap] = useState({});
-  const [paymentMethods, setPaymentMethods] = useState({}); // { [sellerId]: 'bank_transfer' | 'promptpay' | 'credit_card' }
+  const [paymentMethods, setPaymentMethods] = useState({});
   const [copiedStates, setCopiedStates] = useState({});
 
   useEffect(() => {
@@ -79,17 +88,21 @@ export const Checkout = () => {
       for (const sId of sellerIds) {
         try {
           const res = await axios.get(`/api/shops/seller/${sId}`);
-          if (res.data && res.data.success) {
-            newShopsMap[sId] = res.data.data;
+          const shopData = res.data?.data || res.data;
+
+          if (shopData && shopData.seller_id) {
+            newShopsMap[sId] = shopData;
+          } else {
+            throw new Error('Shop data not found');
           }
         } catch (err) {
           console.error(`Error fetching shop info for seller ${sId}:`, err);
-          // Fallback ถ้าดึงไม่ได้
           newShopsMap[sId] = {
-            bank_name: 'ธนาคารกรุงเทพ (BBL)',
-            bank_account: '644-0-699665',
-            account_name: 'กรรณิการ์ เหลือดี',
-            promptpay_number: '0839353986',
+            shop_name: groupedBySeller[sId]?.sellerName || `ร้านค้า #${sId}`,
+            bank_name: 'ธนาคารกสิกรไทย (KBANK)',
+            bank_account: '000-0-00000-0',
+            account_name: 'ผู้ขาย',
+            promptpay_number: '',
             qr_code_url: ''
           };
         }
@@ -100,7 +113,7 @@ export const Checkout = () => {
       setPaymentMethods(initialPayments);
     };
 
-    if (cartItems.length > 0) {
+    if (cartItems && cartItems.length > 0) {
       fetchAllShops();
     }
   }, [cartItems]);
@@ -110,6 +123,7 @@ export const Checkout = () => {
   };
 
   const copyBankNumber = (sellerId, accountNo) => {
+    if (!accountNo) return;
     navigator.clipboard.writeText(accountNo);
     setCopiedStates(prev => ({ ...prev, [sellerId]: true }));
     setTimeout(() => {
@@ -117,10 +131,16 @@ export const Checkout = () => {
     }, 2000);
   };
 
-  // คำนวณยอดรวมทั้งหมดของตะกร้า
+  const handleSlipChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSlipFile(file);
+      setSlipPreview(URL.createObjectURL(file));
+    }
+  };
+
   const totalFullPrice = cartItems.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0);
 
-  // คำนวณยอดภาพรวม
   let totalDueNow = 0;
   let totalRemaining = 0;
   let hasAnyDeposit = false;
@@ -161,7 +181,7 @@ export const Checkout = () => {
     try {
       const fullAddressPayload = `${receiverName} (โทร: ${phoneNumber})\nบ้านเลขที่/ซอย: ${addressNo}\nตำบล/แขวง: ${subdistrict} อ.เภอ/เขต: ${district}\nจ. ${province} รหัสไปรษณีย์ ${postalCode}`;
 
-      // ส่งข้อมูลไปสร้างออเดอร์แยกตามร้านค้า (Backend ของเราจะจัดการแยก Order ให้เอง)
+      // 1. สร้าง FormData หรือ JSON Payload สำหรับส่งออเดอร์
       const orderPayload = {
         shipping_address: fullAddressPayload,
         note: `[รูปแบบการชำระเงิน: ${hasAnyDeposit ? 'ผสมผสาน (มีรายการมัดจำ)' : 'ชำระเต็มจำนวน'}] ${note}`,
@@ -174,7 +194,20 @@ export const Checkout = () => {
         }))
       };
 
-      await createOrder(orderPayload);
+      const res = await createOrder(orderPayload);
+
+      // ถ้าร้านมีระบบสร้างออเดอร์สำเร็จ และมีการแนบสลิปมาด้วย สามารถยิงอัปโหลดสลิปต่อได้ทันที
+      // (รองรับกรณีสร้างออเดอร์แยกหลาย ID หรือ ID เดี่ยว)
+      const createdOrderId = res.data?.data?.createdOrders?.[0] || res.data?.data?.orderId;
+
+      if (slipFile && createdOrderId) {
+        const formData = new FormData();
+        formData.append('slip', slipFile);
+        await axios.post(`/api/orders/${createdOrderId}/upload-slip`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      }
+
       clearCart();
       alert(`✨ สร้างคำสั่งซื้อแยกตามร้านค้าสำเร็จ! กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);
       navigate('/buyer-dashboard?tab=tracker');
@@ -346,7 +379,7 @@ export const Checkout = () => {
             )}
           </div>
 
-          {/* STEP 2: Payment Method (แสดงแยกตามร้านค้า) */}
+          {/* STEP 2: Payment Method */}
           <div className={`clay-card rounded-3xl border transition-all overflow-hidden ${currentStep === 2 ? 'border-[#2A9D8F] ring-2 ring-[#2A9D8F]/20' : 'border-white'}`}>
             <button
               type="button"
@@ -376,12 +409,11 @@ export const Checkout = () => {
                   <span>ระบบจะทำการแยกคำสั่งซื้อ (Split Order) ตามร้านค้าอัตโนมัติ กรุณาตรวจสอบช่องทางชำระเงินของแต่ละร้านด้านล่างนี้ค่ะ</span>
                 </div>
 
-                {/* วนลูปแสดงช่องทางการชำระเงินแยกตามแต่ละร้าน */}
                 {Object.entries(groupedBySeller).map(([sellerId, group]) => {
                   const shop = shopsMap[sellerId] || {};
                   const currentMethod = paymentMethods[sellerId] || 'bank_transfer';
+                  const shopDisplayName = shop.shop_name || group.sellerName;
 
-                  // คำนวณยอดเฉพาะของร้านนี้
                   const shopDueNow = group.items.reduce((sum, item) => {
                     const itemTotal = Number(item.price) * item.quantity;
                     return sum + (item.chosen_payment_type === 'deposit' ? itemTotal / 2 : itemTotal);
@@ -391,7 +423,7 @@ export const Checkout = () => {
                     <div key={sellerId} className="p-5 rounded-3xl bg-white border border-emerald-100 shadow-sm space-y-4">
                       <div className="flex items-center gap-2 pb-3 border-b border-emerald-50">
                         <Store className="w-4 h-4 text-[#2A9D8F]" />
-                        <h4 className="text-sm font-display font-bold text-stone-900">{group.sellerName}</h4>
+                        <h4 className="text-sm font-display font-bold text-stone-900">{shopDisplayName}</h4>
                         <span className="ml-auto text-xs font-bold text-[#E76F51]">ยอดชำระร้านนี้: ฿{shopDueNow.toLocaleString()}</span>
                       </div>
 
@@ -433,7 +465,7 @@ export const Checkout = () => {
                       {/* รายละเอียดบัญชีธนาคารของร้านนี้ */}
                       {currentMethod === 'bank_transfer' && (
                         <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 text-xs space-y-2">
-                          <p className="font-bold text-amber-900">บัญชีธนาคารของ {group.sellerName}</p>
+                          <p className="font-bold text-amber-900">บัญชีธนาคารของ {shopDisplayName}</p>
                           <p className="text-stone-700 font-medium">{shop.bank_name || 'ไม่ระบุธนาคาร'}</p>
                           <div className="flex items-center gap-3">
                             <span className="font-mono text-base font-extrabold text-stone-900 bg-white px-3 py-1 rounded-xl border border-amber-200">
@@ -455,12 +487,19 @@ export const Checkout = () => {
                         </div>
                       )}
 
-                      {/* รายละเอียดพร้อมเพย์และ QR Code ของร้านนี้ พร้อมกำกับยอดเงิน */}
+                      {/* รายละเอียดพร้อมเพย์และ QR Code ของร้านนี้ */}
                       {currentMethod === 'promptpay' && (
                         <div className="p-4 bg-white rounded-2xl border border-emerald-200 text-xs space-y-3 flex flex-col sm:flex-row items-center gap-4">
-                          <div className="w-28 h-28 bg-[#E8F7F3] rounded-2xl border border-[#A2D9D2] flex items-center justify-center p-2 shrink-0">
+                          <div className="w-28 h-28 bg-[#E8F7F3] rounded-2xl border border-[#A2D9D2] flex items-center justify-center p-2 shrink-0 overflow-hidden">
                             {shop.qr_code_url ? (
-                              <img src={shop.qr_code_url} alt="PromptPay QR" className="w-full h-full object-cover rounded-xl" />
+                              <img
+                                src={shop.qr_code_url.startsWith('http') ? shop.qr_code_url : `http://localhost:5000${shop.qr_code_url}`}
+                                alt="PromptPay QR"
+                                className="w-full h-full object-cover rounded-xl"
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                }}
+                              />
                             ) : (
                               <QrCode className="w-16 h-16 text-[#2A9D8F]" />
                             )}
@@ -485,7 +524,7 @@ export const Checkout = () => {
                     onClick={() => setCurrentStep(3)}
                     className="px-6 py-3 rounded-2xl btn-3d-botanical text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>ต่อไป: ตรวจสอบและยืนยัน</span>
+                    <span>ต่อไป: ตรวจสอบและแนบสลิป</span>
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -493,7 +532,7 @@ export const Checkout = () => {
             )}
           </div>
 
-          {/* STEP 3: Review */}
+          {/* STEP 3: Review & Upload Slip */}
           <div className={`clay-card rounded-3xl border transition-all overflow-hidden ${currentStep === 3 ? 'border-[#2A9D8F] ring-2 ring-[#2A9D8F]/20' : 'border-white'}`}>
             <button
               type="button"
@@ -506,10 +545,10 @@ export const Checkout = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-display font-bold text-stone-900">
-                    ตรวจสอบและยืนยันคำสั่งซื้อ (Review & Place Order)
+                    ตรวจสอบคำสั่งซื้อและแนบสลิปชำระเงิน (Review & Slip Upload)
                   </h3>
                   <p className="text-xs text-stone-500 font-normal">
-                    ตรวจสอบความถูกต้องก่อนยืนยันคำสั่งซื้อ
+                    แนบหลักฐานการโอนเงินเพื่อส่งตรวจและเริ่มงานคราฟต์ทันที
                   </p>
                 </div>
               </div>
@@ -517,15 +556,34 @@ export const Checkout = () => {
             </button>
 
             {currentStep === 3 && (
-              <div className="p-6 sm:p-8 pt-2 border-t border-emerald-100/60 space-y-4 bg-white/40">
+              <div className="p-6 sm:p-8 pt-2 border-t border-emerald-100/60 space-y-6 bg-white/40">
                 <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 text-xs space-y-2 text-stone-700">
                   <div className="flex items-center gap-2 text-[#2A9D8F] font-bold">
                     <HeartHandshake className="w-4 h-4" />
-                    <span>เงื่อนไขการแยกคำสั่งซื้อตามร้านค้า</span>
+                    <span>แนบหลักฐานการชำระเงิน (งวดแรก / เต็มจำนวน)</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-stone-600">
-                    ระบบจะสร้างออเดอร์แยกตามแต่ละร้านค้าให้โดยอัตโนมัติ คุณสามารถติดตามสถานะงานได้ในหน้า <strong>"Craft Tracker"</strong>
+                    กรุณาแนบสลิปโอนเงินยอดรวม <strong>฿{totalDueNow.toLocaleString()}</strong> เพื่อให้ร้านค้าตรวจสอบและเริ่มเข้าสู่กระบวนการผลิตใน Craft Tracker ทันที
                   </p>
+                </div>
+
+                {/* ส่วนอัปโหลดรูปสลิป */}
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-stone-800 block">อัปโหลดสลิปโอนเงิน (Payment Slip) *</label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed border-emerald-200 rounded-2xl bg-white hover:bg-emerald-50/50 transition-colors cursor-pointer">
+                      <Upload className="w-6 h-6 text-[#2A9D8F] mb-2" />
+                      <span className="text-xs font-bold text-stone-700">คลิกเพื่อเลือกไฟล์รูปภาพสลิป</span>
+                      <span className="text-[10px] text-stone-400 mt-0.5">PNG, JPG หรือ JPEG (ขนาดไม่เกิน 5MB)</span>
+                      <input type="file" accept="image/*" onChange={handleSlipChange} className="hidden" />
+                    </label>
+
+                    {slipPreview && (
+                      <div className="w-28 h-28 rounded-2xl border border-emerald-200 bg-stone-50 overflow-hidden relative shrink-0">
+                        <img src={slipPreview} alt="Slip Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="pt-2 flex justify-end">
@@ -535,7 +593,7 @@ export const Checkout = () => {
                     disabled={submitting}
                     className="w-full sm:w-auto px-10 py-4 btn-3d-peach text-sm font-bold rounded-2xl shadow-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>{submitting ? 'กำลังสร้างออเดอร์แยกตามร้าน...' : 'ยืนยันและส่งคำสั่งซื้อทันที'}</span>
+                    <span>{submitting ? 'กำลังสร้างออเดอร์และส่งสลิป...' : 'ยืนยันและส่งคำสั่งซื้อทันที'}</span>
                     <Sparkles className="w-4 h-4" />
                   </button>
                 </div>

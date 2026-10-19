@@ -15,7 +15,8 @@ import {
     AlertTriangle,
     RefreshCw,
     AlertCircle,
-    Send
+    Send,
+    Store
 } from 'lucide-react';
 import { getMyOrders, uploadPaymentSlip, uploadFinalPaymentSlip } from '../../../services/orderService';
 import api from '../../../services/api';
@@ -82,7 +83,7 @@ export const CraftTrackingTab = () => {
         }
     };
 
-    // 1. ฟังก์ชันผู้ซื้อกด "ยืนยันได้รับสินค้าและเสร็จสิ้น" (แก้ไขให้ยิงตรงเส้น confirm-received)
+    // 1. ฟังก์ชันผู้ซื้อกด "ยืนยันได้รับสินค้าและเสร็จสิ้น"
     const handleConfirmReceived = async (orderId) => {
         if (!window.confirm('คุณได้รับสินค้าถูกต้องและสมบูรณ์แล้วใช่หรือไม่?')) return;
 
@@ -175,12 +176,6 @@ export const CraftTrackingTab = () => {
                         const isCompleted = order.craft_status === 'completed' || order.status === 'completed';
                         const isSlipRejected = order.payment_status === 'rejected' || (latestTimelineNote && latestTimelineNote.includes('สลิปไม่ถูกต้อง'));
 
-                        const isPendingApproval =
-                            order.craft_status === 'order_placed' ||
-                            order.status === 'pending' ||
-                            order.craft_status === 'pending' ||
-                            (!order.craft_status && !order.payment_status);
-
                         const isPaymentVerified = !isSlipRejected && (
                             order.payment_status === 'paid' ||
                             order.status === 'paid' ||
@@ -193,8 +188,6 @@ export const CraftTrackingTab = () => {
 
                         const isAwaitingFinalPayment = order.craft_status === 'awaiting_final_payment';
                         const hasUploadedFinalSlip = Boolean(order.final_payment_slip_url);
-
-                        // เช็กว่าสลิปรอบสองได้รับการอนุมัติจากร้านค้าแล้วหรือยัง (เปลี่ยนเป็น ready_to_ship หรือ completed)
                         const isFinalPaymentVerified = isCompleted || order.craft_status === 'ready_to_ship';
 
                         const remainingAmount = order.remaining_balance || (Number(order.total_amount) - Number(order.deposit_amount || Math.round(order.total_amount * 0.5)));
@@ -203,10 +196,16 @@ export const CraftTrackingTab = () => {
                             <div key={order.id} className="clay-card p-6 rounded-3xl border border-stone-200 bg-white shadow-sm space-y-6">
                                 {/* Header คำสั่งซื้อ */}
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-100 text-xs">
-                                    <div className="space-y-1">
+                                    <div className="space-y-1.5">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="font-bold text-stone-900 text-sm">คำสั่งซื้อ #{order.id}</span>
                                             <span className="text-stone-400">({new Date(order.created_at).toLocaleDateString('th-TH')})</span>
+                                        </div>
+
+                                        {/* 👈 เพิ่มแสดงชื่อร้านค้าในออเดอร์นี้ */}
+                                        <div className="flex items-center gap-1.5 text-[#2A9D8F] font-bold">
+                                            <Store className="w-3.5 h-3.5" />
+                                            <span>ร้านค้า: {order.shop_name || 'ร้านค้าแฮนด์เมด'}</span>
                                         </div>
 
                                         <div className="pt-1">
@@ -257,6 +256,22 @@ export const CraftTrackingTab = () => {
                                     </div>
                                 </div>
 
+                                {/* รายการสินค้าในออเดอร์นี้ */}
+                                <div className="space-y-2">
+                                    <span className="text-xs font-bold text-stone-700 block">รายการสินค้าในคำสั่งซื้อนี้:</span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {order.items?.map((item, idx) => (
+                                            <div key={idx} className="p-2.5 bg-stone-50 rounded-2xl border border-stone-100 flex items-center gap-3 text-xs">
+                                                <img src={item.image_url || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=150&q=80'} alt={item.title} className="w-10 h-10 rounded-xl object-cover border border-white shrink-0" />
+                                                <div className="truncate">
+                                                    <p className="font-bold text-stone-900 truncate">{item.title}</p>
+                                                    <p className="text-stone-400 text-[11px]">จำนวน: {item.quantity} • ฿{Number(item.price).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 {/* บันทึกข้อความจากช่างฝีมือ */}
                                 <div className={`p-4 rounded-2xl border text-xs space-y-1 ${isSlipRejected ? 'bg-rose-50/70 border-rose-200' : 'bg-emerald-50/60 border-emerald-100'}`}>
                                     <span className={`font-bold flex items-center gap-1.5 ${isSlipRejected ? 'text-rose-800' : 'text-[#1B4332]'}`}>
@@ -266,9 +281,7 @@ export const CraftTrackingTab = () => {
                                         {latestTimelineNote || order.seller_reply || (
                                             isPaymentVerified
                                                 ? 'ร้านค้าตรวจสอบสลิปเรียบร้อย กำลังรังสรรค์ผลงานครับ'
-                                                : isPendingApproval
-                                                    ? 'ส่งคำสั่งซื้อสำเร็จ อยู่ระหว่างรอร้านค้าตรวจสอบและกดอนุมัติรับคำสั่งซื้อ'
-                                                    : 'ร้านค้าอนุมัติคำสั่งซื้อแล้ว สามารถโอนเงินและแนบสลิปได้เลยค่ะ'
+                                                : 'ร้านค้าได้รับคำสั่งซื้อแล้ว อยู่ระหว่างรอตรวจสอบหลักฐานการชำระเงิน'
                                         )}
                                     </p>
                                 </div>
@@ -297,11 +310,7 @@ export const CraftTrackingTab = () => {
                                             )}
                                         </div>
 
-                                        {isPendingApproval && !hasUploadedSlip ? (
-                                            <button disabled className="w-full py-2.5 px-4 bg-stone-200 text-stone-400 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-not-allowed">
-                                                <Lock className="w-3.5 h-3.5" /> <span>แนบสลิปชำระเงิน (รอร้านอนุมัติคำสั่งซื้อก่อน)</span>
-                                            </button>
-                                        ) : isSlipRejected ? (
+                                        {isSlipRejected ? (
                                             <div className="p-3 bg-rose-50 rounded-2xl border border-rose-200 space-y-2">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[11px] font-bold text-rose-700 flex items-center gap-1">

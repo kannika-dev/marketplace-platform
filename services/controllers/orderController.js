@@ -50,6 +50,7 @@ export const createOrder = async (req, res) => {
 
       if (!itemsBySeller[sellerId]) {
         itemsBySeller[sellerId] = {
+          sellerId,
           totalAmount: 0,
           depositAmount: 0,
           remainingBalance: 0,
@@ -80,6 +81,7 @@ export const createOrder = async (req, res) => {
     for (const [sellerId, group] of Object.entries(itemsBySeller)) {
       const overallPaymentType = group.hasDeposit ? 'deposit' : 'full';
 
+      // บันทึก order พร้อมเก็บ seller_id (หากตาราง orders มีคอลัมน์ seller_id) หรือเชื่อมผ่าน items
       const [orderResult] = await connection.query(
         `INSERT INTO orders (buyer_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
@@ -107,7 +109,7 @@ export const createOrder = async (req, res) => {
         );
       }
 
-      // 4. บันทึก Timeline เริ่มต้นใน craft_tracking_logs[cite: 9]
+      // 4. บันทึก Timeline เริ่มต้นใน craft_tracking_logs
       await connection.query(
         `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
          VALUES (?, 'order_placed', 'คำสั่งซื้อถูกส่งเรียบร้อย', 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
@@ -138,7 +140,7 @@ export const createOrder = async (req, res) => {
 };
 
 /**
- * Get orders for currently logged in buyer (ดึงข้อมูล timeline, notes และ image_url ครบถ้วน)[cite: 9]
+ * Get orders for currently logged in buyer (ดึงข้อมูลรายการสินค้า ข้อมูลร้านค้า และ Timeline ครบถ้วน)
  */
 export const getMyOrders = async (req, res) => {
   try {
@@ -150,10 +152,12 @@ export const getMyOrders = async (req, res) => {
     );
 
     for (const order of orders) {
+      // ดึงสินค้า พร้อมชื่อร้านค้า (shop_name) และ seller_id ของสินค้านั้นๆ
       const [items] = await pool.query(
-        `SELECT oi.*, p.title, p.image_url 
+        `SELECT oi.*, p.title, p.image_url, p.seller_id, s.shop_name 
          FROM order_items oi
          LEFT JOIN products p ON oi.product_id = p.id
+         LEFT JOIN shops s ON p.seller_id = s.seller_id
          WHERE oi.order_id = ?`,
         [order.id]
       );
@@ -168,6 +172,9 @@ export const getMyOrders = async (req, res) => {
 
       order.items = items;
       order.timeline = logs;
+
+      // กำหนดชื่อร้านค้าหลักของการ์ดอิศเรศนี้ (ถ้ามีสินค้าจากร้าน ให้ดึงชื่อร้านแรกมาแสดง)
+      order.shop_name = items.length > 0 ? (items[0].shop_name || `ร้านค้า #${items[0].seller_id}`) : 'ร้านค้าแฮนด์เมด';
     }
 
     return res.json({
@@ -181,7 +188,7 @@ export const getMyOrders = async (req, res) => {
 };
 
 /**
- * Get orders for currently logged in buyer (Alias สำหรับ getBuyerOrders)[cite: 9]
+ * Get orders for currently logged in buyer (Alias สำหรับ getBuyerOrders)
  */
 export const getBuyerOrders = async (req, res) => {
   return getMyOrders(req, res);
@@ -217,9 +224,10 @@ export const getOrderById = async (req, res) => {
     }
 
     const [items] = await pool.query(
-      `SELECT oi.*, p.title, p.image_url, p.lead_time_days, p.is_made_to_order 
+      `SELECT oi.*, p.title, p.image_url, p.lead_time_days, p.is_made_to_order, p.seller_id, s.shop_name 
        FROM order_items oi
        LEFT JOIN products p ON oi.product_id = p.id
+       LEFT JOIN shops s ON p.seller_id = s.seller_id
        WHERE oi.order_id = ?`,
       [id]
     );
@@ -234,6 +242,7 @@ export const getOrderById = async (req, res) => {
 
     order.items = items;
     order.timeline = timeline;
+    order.shop_name = items.length > 0 ? (items[0].shop_name || `ร้านค้า #${items[0].seller_id}`) : 'ร้านค้าแฮนด์เมด';
 
     return res.json({ success: true, data: order });
   } catch (error) {

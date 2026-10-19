@@ -60,22 +60,22 @@ export const ManageOrders = () => {
     fetchOrders();
   }, []);
 
-  // 1. อนุมัติรับคำสั่งซื้อ (ปลดล็อกปุ่มแนบสลิปงวดแรกให้ผู้ซื้อ)
+  // 1. อนุมัติรับคำสั่งซื้อ
   const handleApproveOrder = async (orderId) => {
-    if (!window.confirm('คุณต้องการอนุมัติคำสั่งซื้อนี้ เพื่อเปิดให้ลูกค้าแนบสลิปชำระเงินใช่หรือไม่?')) return;
+    if (!window.confirm('คุณต้องการอนุมัติรับคำสั่งซื้อนี้ใช่หรือไม่?')) return;
 
     setUpdatingId(orderId);
     try {
       const formData = new FormData();
       formData.append('craft_status', 'awaiting_deposit');
       formData.append('step_title', 'รับคำสั่งซื้อเรียบร้อยแล้ว');
-      formData.append('note', 'ร้านค้าอนุมัติคำสั่งซื้อเรียบร้อยแล้ว กรุณาโอนเงินและแนบสลิปชำระเงินค่ะ');
+      formData.append('note', 'ร้านค้าอนุมัติคำสั่งซื้อเรียบร้อยแล้ว กรุณาตรวจสอบการชำระเงินค่ะ');
 
       await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert('✨ อนุมัติคำสั่งซื้อสำเร็จ! ปลดล็อกช่องแนบสลิปให้ผู้ซื้อเรียบร้อยแล้ว');
+      alert('✨ ออนุมัติคำสั่งซื้อสำเร็จ!');
       fetchOrders();
     } catch (err) {
       console.error('Approve order error:', err);
@@ -85,7 +85,7 @@ export const ManageOrders = () => {
     }
   };
 
-  // 2. ยืนยันสลิปถูกต้อง (งวดแรก)
+  // 2. ยืนยันสลิปถูกต้อง (งวดแรก / จ่ายเต็ม)
   const handleApprovePayment = async (orderId) => {
     if (!window.confirm('คุณต้องการยืนยันว่าสลิปการชำระเงินถูกต้องใช่หรือไม่?')) return;
 
@@ -93,8 +93,8 @@ export const ManageOrders = () => {
     try {
       const formData = new FormData();
       formData.append('craft_status', 'in_progress');
-      formData.append('step_title', 'ตรวจสอบสลิปมัดจำเรียบร้อย');
-      formData.append('note', 'ร้านค้าตรวจสอบสลิปโอนเงินถูกต้องเรียบร้อยแล้ว เริ่มดำเนินงานคราฟต์พิถีพิถัน');
+      formData.append('step_title', 'ตรวจสอบสลิปชำระเงินเรียบร้อย');
+      formData.append('note', 'ร้านค้าตรวจสอบหลักฐานการโอนเงินถูกต้องเรียบร้อยแล้ว เริ่มดำเนินงานคราฟต์พิถีพิถัน');
 
       await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
@@ -118,7 +118,7 @@ export const ManageOrders = () => {
     try {
       const formData = new FormData();
       formData.append('craft_status', 'awaiting_final_payment');
-      formData.append('step_title', '✨ ผลงานเสร็จเรียบร้อยแล้ว - รอชำระเงินครั้งที่ 2');
+      formData.append('step_title', '✨ ผลงานเสร็จเรียบร้อยแล้ว - รอชำระยอดคงเหลือ');
       formData.append('note', `ชิ้นงานของคุณประดิษฐ์เสร็จสมบูรณ์แล้ว กรุณาชำระยอดคงเหลือ ฿${remainingAmount.toLocaleString()} และแนบสลิปรอบสองเพื่อเตรียมการจัดส่งค่ะ`);
 
       await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
@@ -135,7 +135,7 @@ export const ManageOrders = () => {
     }
   };
 
-  // 4. ยืนยันสลิปรอบที่ 2 ถูกต้อง (จ่ายครบ 100% พร้อมส่งมอบ)
+  // 4. ยืนยันสลิปรอบที่ 2 ถูกต้อง (จ่ายครบ 100% พร้อมจัดส่ง)
   const handleApproveFinalPayment = async (orderId) => {
     if (!window.confirm('คุณต้องการยืนยันว่าสลิปการชำระเงินงวดสุดท้ายถูกต้องใช่หรือไม่?')) return;
 
@@ -281,7 +281,7 @@ export const ManageOrders = () => {
             <span>ARTISAN JOURNAL &amp; PRODUCTION CONTROL</span>
           </div>
           <h1 className="text-3xl sm:text-5xl font-display font-extrabold text-stone-900 tracking-tight leading-tight">
-            จัดการคำสั่งซื้อ <span className="font-serif italic text-[#1B4332] font-normal">&amp; บันทึกเรื่องราวงานคราฟต์</span>
+            จัดการคำสั่งซื้อ <span className="font-serif italic text-[#1B4332] font-normal">&amp; ตรวจสอบสลิปโอนเงิน</span>
           </h1>
         </div>
 
@@ -293,8 +293,8 @@ export const ManageOrders = () => {
             className="text-xs font-mono font-bold py-2 px-3 bg-white border border-stone-200 rounded-xl focus:outline-none focus:border-[#1B4332] text-stone-800"
           >
             <option value="all">ALL ORDERS ({orders.length})</option>
-            <option value="order_placed">รออนุมัติคำสั่งซื้อ</option>
-            <option value="awaiting_deposit">รอชำระมัดจำ</option>
+            <option value="order_placed">รอดำเนินการ</option>
+            <option value="awaiting_deposit">รอชำระเงิน/แนบสลิป</option>
             <option value="in_progress">กำลังผลิตงานคราฟต์</option>
             <option value="awaiting_final_payment">รอชำระเงินงวดที่ 2</option>
             <option value="ready_to_ship">พร้อมจัดส่ง</option>
@@ -318,7 +318,6 @@ export const ManageOrders = () => {
             const currentCraftStatus = ord.craft_status || 'order_placed';
             const isDeposit = ord.payment_type === 'deposit';
 
-            const isPendingApproval = currentCraftStatus === 'order_placed' || ord.status === 'pending' || ord.status === 'pending_approval';
             const hasUploadedSlip = Boolean(ord.payment_slip_url);
             const hasUploadedFinalSlip = Boolean(ord.final_payment_slip_url);
 
@@ -366,10 +365,10 @@ export const ManageOrders = () => {
                   </div>
                 </div>
 
-                {/* 📌 แผงควบคุมการอนุมัติและสลิป (แยก 2 กล่องชัดเจนระหว่างงวด 1 และงวด 2) */}
+                {/* 📌 แผงตรวจสอบสลิปโอนเงิน (รองรับการแนบสลิปทันทีจากหน้า Checkout และงวดที่ 2) */}
                 <div className="space-y-4">
 
-                  {/* กล่องที่ 1: สลิปมัดจำ / งวดแรก */}
+                  {/* กล่องที่ 1: สลิปงวดแรก / จ่ายเต็ม */}
                   <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       {ord.payment_slip_url ? (
@@ -377,42 +376,28 @@ export const ManageOrders = () => {
                           onClick={() => setPreviewImage(ord.payment_slip_url)}
                           className="relative w-16 h-16 rounded-xl overflow-hidden border border-stone-300 shrink-0 cursor-pointer group shadow-sm bg-white"
                         >
-                          <img src={ord.payment_slip_url} alt="สลิปมัดจำ" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                          <img src={ord.payment_slip_url} alt="สลิปงวดแรก" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
                             <Eye className="w-4 h-4" />
                           </div>
                         </div>
                       ) : (
                         <div className="w-16 h-16 rounded-xl bg-stone-200 flex items-center justify-center text-stone-400 text-[10px] font-mono shrink-0">
-                          {hasUploadedSlip ? 'มีสลิป' : 'รอสลิปงวด 1'}
+                          รอสลิป
                         </div>
                       )}
                       <div>
-                        <span className="font-bold text-xs text-stone-900 block">หลักฐานสลิปมัดจำ (งวดที่ 1)</span>
+                        <span className="font-bold text-xs text-stone-900 block">หลักฐานสลิปการชำระเงิน (งวดแรก / เต็มจำนวน)</span>
                         <span className="text-[11px] text-stone-500">
-                          {isPendingApproval
-                            ? 'รออนุมัติคำสั่งซื้อก่อน'
-                            : hasUploadedSlip
-                              ? 'ลูกค้าแนบสลิปมัดจำแล้ว กรุณาตรวจสอบ'
-                              : 'รอผู้ซื้อโอนเงินมัดจำ'}
+                          {hasUploadedSlip
+                            ? '✨ ลูกค้าแนบสลิปมาแล้ว กรุณาตรวจสอบความถูกต้อง'
+                            : 'ยังไม่มีการแนบสลิปจากผู้ซื้อ'}
                         </span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      {isPendingApproval && (
-                        <button
-                          type="button"
-                          disabled={updatingId === ord.id}
-                          onClick={() => handleApproveOrder(ord.id)}
-                          className="px-4 py-2.5 bg-[#2A9D8F] hover:bg-[#21867a] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>✅ อนุมัติรับคำสั่งซื้อ</span>
-                        </button>
-                      )}
-
-                      {hasUploadedSlip && currentCraftStatus === 'awaiting_deposit' && (
+                      {hasUploadedSlip && currentCraftStatus !== 'in_progress' && currentCraftStatus !== 'ready_to_ship' && currentCraftStatus !== 'completed' && (
                         <>
                           <button
                             type="button"
@@ -420,7 +405,7 @@ export const ManageOrders = () => {
                             onClick={() => handleApprovePayment(ord.id)}
                             className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
                           >
-                            ✅ ยืนยันสลิปมัดจำถูกต้อง
+                            ✅ ยืนยันสลิปถูกต้อง
                           </button>
                           <button
                             type="button"
@@ -433,6 +418,7 @@ export const ManageOrders = () => {
                         </>
                       )}
 
+                      {/* ปุ่มแจ้งชำระเงินงวดที่ 2 สำหรับสินค้าแบบมัดจำ */}
                       {isDeposit && (currentCraftStatus === 'in_progress' || currentCraftStatus === 'production_finished') && (
                         <button
                           type="button"
@@ -447,7 +433,7 @@ export const ManageOrders = () => {
                     </div>
                   </div>
 
-                  {/* กล่องที่ 2: สลิปยอดคงเหลือ / งวดที่ 2 (แสดงเฉพาะออเดอร์แบบมัดจำเมื่อมีการเรียกเก็บเงินแล้ว) */}
+                  {/* กล่องที่ 2: สลิปยอดคงเหลือ / งวดที่ 2 (แสดงเมื่อเป็นออเดอร์มัดจำ) */}
                   {isDeposit && (isAwaitingFinalPayment || hasUploadedFinalSlip || currentCraftStatus === 'ready_to_ship' || isCompleted) && (
                     <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
