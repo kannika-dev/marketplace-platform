@@ -17,7 +17,7 @@ export const getOrderById = async (id) => {
 
 export const uploadPaymentSlip = async (orderId, file) => {
   const formData = new FormData();
-  formData.append('slip', file);
+  formData.append('payment_slip', file); // ✅ เปลี่ยนจาก 'slip' เป็น 'payment_slip'
   const response = await api.post(`/orders/${orderId}/upload-slip`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -31,7 +31,7 @@ export const uploadPaymentSlip = async (orderId, file) => {
  */
 export const uploadFinalPaymentSlip = async (orderId, file) => {
   const formData = new FormData();
-  formData.append('slip', file);
+  formData.append('payment_slip', file); // ✅ เปลี่ยนจาก 'slip' เป็น 'payment_slip'
   const response = await api.post(`/orders/${orderId}/upload-final-slip`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data'

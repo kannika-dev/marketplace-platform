@@ -2,19 +2,36 @@ import pool from '../config/db.js';
 import { getSecureCloudinaryUrl } from '../middleware/uploadMiddleware.js';
 
 /**
- * Create new orders with items (Supports splitting orders automatically by seller and per-item payment selection)
+ * Create new orders with items and initial payment slip (Supports splitting orders automatically by seller and direct slip attachment)
  */
 export const createOrder = async (req, res) => {
   const connection = await pool.getConnection();
   try {
     const buyerId = req.user.id;
-    const { items, shipping_address, note, payment_method } = req.body;
+    const { shipping_address, note, payment_method } = req.body;
+    let items = req.body.items;
+
+    if (typeof items === 'string') {
+      try {
+        items = JSON.parse(items);
+      } catch (e) {
+        items = [];
+      }
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Order must contain at least one item.'
       });
+    }
+
+    // จัดการรูปสลิปงวดแรกที่แนบมาพร้อมกับตอนสร้างคำสั่งซื้อ (ถ้ามี)
+    let slipUrl = null;
+    if (req.file) {
+      slipUrl = getSecureCloudinaryUrl(req.file);
+    } else if (req.body.payment_slip_url) {
+      slipUrl = req.body.payment_slip_url;
     }
 
     await connection.beginTransaction();
@@ -77,30 +94,32 @@ export const createOrder = async (req, res) => {
 
     const createdOrders = [];
 
-    // 2. วนลูปสร้าง Order แยกตามแต่ละร้านค้าอัตโนมัติ (Split Orders by Seller) พร้อมบันทึก seller_id ลงตาราง orders
+    // 2. วนลูปสร้าง Order แยกตามแต่ละร้านค้าอัตโนมัติ พร้อมบันทึก payment_slip_url ลงตาราง orders ทันที
     for (const [sellerId, group] of Object.entries(itemsBySeller)) {
       const overallPaymentType = group.hasDeposit ? 'deposit' : 'full';
+      const initialStatus = slipUrl ? 'pending_verification' : 'unpaid';
 
       const [orderResult] = await connection.query(
-        `INSERT INTO orders (buyer_id, seller_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        `INSERT INTO orders (buyer_id, seller_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, payment_slip_url, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
           buyerId,
-          sellerId, // บันทึก seller_id ของร้านค้านี้ลงในตาราง orders
+          sellerId,
           group.totalAmount,
-          'unpaid',
+          initialStatus,
           shipping_address || '',
           overallPaymentType,
           payment_method || 'bank_transfer',
           group.depositAmount,
-          group.remainingBalance
+          group.remainingBalance,
+          slipUrl || null // ✅ บันทึกลง payment_slip_url ตั้งแต่แรก
         ]
       );
 
       const orderId = orderResult.insertId;
       createdOrders.push(orderId);
 
-      // 3. บันทึก order_items สำหรับร้านค้านี้ (เอา payment_type ออกเพราะตาราง order_items ไม่มีคอลัมน์นี้)
+      // 3. บันทึก order_items สำหรับร้านค้านี้
       for (const it of group.items) {
         await connection.query(
           `INSERT INTO order_items (order_id, product_id, quantity, price, customization_notes)
@@ -110,10 +129,13 @@ export const createOrder = async (req, res) => {
       }
 
       // 4. บันทึก Timeline เริ่มต้นใน craft_tracking_logs
+      const logTitle = slipUrl ? 'ส่งหลักฐานการชำระเงินแล้ว' : 'คำสั่งซื้อถูกส่งเรียบร้อย';
+      const logNotes = slipUrl ? 'ร้านค้ากำลังตรวจสอบสลิปโอนเงิน' : 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน';
+
       await connection.query(
         `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
-         VALUES (?, 'order_placed', 'คำสั่งซื้อถูกส่งเรียบร้อย', 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
-        [orderId]
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [orderId, slipUrl ? 'payment_uploaded' : 'order_placed', logTitle, logNotes, slipUrl || null]
       );
     }
 
@@ -121,7 +143,7 @@ export const createOrder = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Orders created and split successfully by seller.',
+      message: 'Orders created and payment slips uploaded successfully.',
       data: {
         createdOrders
       }
@@ -146,7 +168,6 @@ export const getMyOrders = async (req, res) => {
   try {
     const buyerId = req.user.id;
 
-    // ดึงออเดอร์พร้อม JOIN ตาราง shops ด้วย seller_id ของตาราง orders โดยตรง
     const [orders] = await pool.query(
       `SELECT o.*, s.shop_name 
        FROM orders o
@@ -177,7 +198,6 @@ export const getMyOrders = async (req, res) => {
       order.items = items;
       order.timeline = logs;
 
-      // กำหนดชื่อร้านค้าหลัก
       if (!order.shop_name) {
         order.shop_name = items.length > 0 ? (items[0].shop_name || `ร้านค้า #${items[0].seller_id}`) : 'ร้านค้าแฮนด์เมด';
       }
@@ -392,4 +412,4 @@ export const confirmReceivedOrder = async (req, res) => {
   } finally {
     connection.release();
   }
-};   
+};

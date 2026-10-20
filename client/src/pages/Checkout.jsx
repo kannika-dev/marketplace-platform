@@ -188,40 +188,33 @@ export const Checkout = () => {
     try {
       const fullAddressPayload = `${receiverName} (โทร: ${phoneNumber})\nบ้านเลขที่/ซอย: ${addressNo}\nตำบล/แขวง: ${subdistrict} อ.เภอ/เขต: ${district}\nจ. ${province} รหัสไปรษณีย์ ${postalCode}`;
 
-      const orderPayload = {
-        shipping_address: fullAddressPayload,
-        note: `[รูปแบบการชำระเงิน: ${hasAnyDeposit ? 'ผสมผสาน (มีรายการมัดจำ)' : 'ชำระเต็มจำนวน'}] ${note}`,
-        payment_method: Object.values(paymentMethods)[0] || 'bank_transfer',
-        items: cartItems.map((item) => ({
-          product_id: item.id || item.product_id,
-          quantity: Number(item.quantity) || 1,
-          payment_type: item.chosen_payment_type || 'full',
-          customization_notes: item.selectedOptions ? JSON.stringify(item.selectedOptions) : (item.customization_notes || null)
-        }))
-      };
+      // ใช้ FormData เพื่อแนบไฟล์สลิปไปพร้อมกับข้อมูลคำสั่งซื้อในก้อนเดียว
+      const formData = new FormData();
+      formData.append('shipping_address', fullAddressPayload);
+      formData.append('note', `[รูปแบบการชำระเงิน: ${hasAnyDeposit ? 'ผสมผสาน (มีรายการมัดจำ)' : 'ชำระเต็มจำนวน'}] ${note}`);
+      formData.append('payment_method', Object.values(paymentMethods)[0] || 'bank_transfer');
 
-      const res = await createOrder(orderPayload);
-      const createdOrders = res.data?.data?.createdOrders || [];
-      const singleOrderId = res.data?.data?.orderId;
+      const itemsPayload = cartItems.map((item) => ({
+        product_id: item.id || item.product_id,
+        quantity: Number(item.quantity) || 1,
+        payment_type: item.chosen_payment_type || 'full',
+        customization_notes: item.selectedOptions ? JSON.stringify(item.selectedOptions) : (item.customization_notes || null)
+      }));
+      formData.append('items', JSON.stringify(itemsPayload));
 
-      // อัปโหลดสลิปแยกตามร้านค้าที่สร้างขึ้นมา
-      const sellerIds = Object.keys(groupedBySeller);
-      for (let i = 0; i < sellerIds.length; i++) {
-        const sId = sellerIds[i];
-        const fileToUpload = slipFiles[sId];
-        const targetOrderId = createdOrders[i] || singleOrderId;
-
-        if (fileToUpload && targetOrderId) {
-          const formData = new FormData();
-          formData.append('slip', fileToUpload);
-          await api.post(`/orders/${targetOrderId}/upload-slip`, formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          });
-        }
+      // แนบไฟล์สลิปของร้านแรก (หรือดึงตาม sellerId หลัก)
+      const firstSellerId = Object.keys(groupedBySeller)[0];
+      const mainSlipFile = slipFiles[firstSellerId];
+      if (mainSlipFile) {
+        formData.append('payment_slip', mainSlipFile); // ✅ ส่งฟิลด์ payment_slip ไปพร้อมสร้างออร์เดอร์
       }
 
+      await api.post('/orders', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
       clearCart();
-      alert(`✨ สร้างคำสั่งซื้อแยกตามร้านค้าและอัปโหลดสลิปสำเร็จ! กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);
+      alert(`✨ สร้างคำสั่งซื้อและแนบสลิปสำเร็จ! กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);
       navigate('/buyer-dashboard?tab=tracker');
     } catch (err) {
       console.error('Place order error:', err);
