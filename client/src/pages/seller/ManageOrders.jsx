@@ -12,7 +12,10 @@ import {
   Sparkles,
   CreditCard,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Clock,
+  Layers,
+  Tag
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -37,6 +40,8 @@ export const ManageOrders = () => {
   const [customTitle, setCustomTitle] = useState({});
   const [customNote, setCustomNote] = useState({});
   const [updateImageFile, setUpdateImageFile] = useState({});
+  // State สำหรับเลือกสินค้าชิ้นย่อยเพื่ออัปเดตสเต็ปงานคราฟต์
+  const [selectedProductItem, setSelectedProductItem] = useState({});
 
   const [filterStatus, setFilterStatus] = useState('all');
   const [previewImage, setPreviewImage] = useState(null);
@@ -186,7 +191,7 @@ export const ManageOrders = () => {
     }
   };
 
-  // 6. บันทึกเรื่องราว Artisan Journal
+  // 6. บันทึกเรื่องราว Artisan Journal (รองรับทั้งการอัปเดตรวม และเลือกสินค้าชิ้นย่อยแบบ 1:1)
   const handleSaveJournalUpdate = async (orderId, titleText, noteText) => {
     if (!titleText || titleText.trim() === '') {
       alert('กรุณาระบุหัวข้อหรือสถานะความคืบหน้า');
@@ -196,11 +201,20 @@ export const ManageOrders = () => {
     setUpdatingId(orderId);
     try {
       const imageFile = updateImageFile[orderId];
+      const chosenItem = selectedProductItem[orderId];
+      let finalTitle = String(titleText).trim();
+
+      // หากเลือกสินค้าชิ้นใดชิ้นหนึ่ง และหัวข้อยังไม่มีชื่อสินค้านำหน้า ให้ใส่ชื่อสินค้าเพื่อความชัดเจน 1:1
+      if (chosenItem && chosenItem !== 'all') {
+        if (!finalTitle.includes(chosenItem)) {
+          finalTitle = `[${chosenItem}] ${finalTitle}`;
+        }
+      }
 
       const formData = new FormData();
       formData.append('craft_status', 'in_progress');
-      formData.append('step_title', String(titleText));
-      formData.append('note', String(noteText));
+      formData.append('step_title', finalTitle);
+      formData.append('note', String(noteText || ''));
 
       if (imageFile) {
         formData.append('image', imageFile);
@@ -210,7 +224,7 @@ export const ManageOrders = () => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert(`✨ บันทึกเรื่องราว "${titleText}" เรียบร้อยแล้ว!`);
+      alert(`✨ บันทึกเรื่องราว "${finalTitle}" เรียบร้อยแล้ว!`);
 
       setUpdateImageFile({ ...updateImageFile, [orderId]: null });
       setCustomTitle({ ...customTitle, [orderId]: '' });
@@ -489,27 +503,115 @@ export const ManageOrders = () => {
 
                 </div>
 
-                {/* รายการสินค้า */}
+                {/* รายการสินค้าแยกชิ้นย่อย 1:1 ตรงกันกับฝั่งผู้ซื้อ */}
                 <div className="space-y-3">
-                  <span className="text-[10px] font-mono tracking-widest uppercase text-stone-400 font-bold block">
-                    ORDERED PIECES // {ord.items?.length || 0} ITEM(S)
-                  </span>
-                  {ord.items?.map((it, idx) => (
-                    <div
-                      key={idx}
-                      className="p-4 bg-stone-50 rounded-2xl text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border border-stone-200/60"
-                    >
-                      <div className="space-y-0.5">
-                        <span className="font-display font-bold text-stone-900 text-sm sm:text-base">
-                          {it.product_title || it.title} × {it.quantity}
-                        </span>
-                        {renderCustomizationDetails(it.customization_details || it.customization_notes)}
-                      </div>
-                      <span className="font-mono font-extrabold text-stone-900 text-base shrink-0">
-                        ฿{Number(it.price).toLocaleString()}
-                      </span>
-                    </div>
-                  ))}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono tracking-widest uppercase text-stone-400 font-bold block">
+                      ORDERED PIECES // {ord.items?.length || 0} ITEM(S)
+                    </span>
+                    <span className="text-[11px] text-stone-500 font-medium">
+                      รายการสินค้าที่ลูกค้าสั่งทำในออเดอร์นี้
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {ord.items?.map((it, idx) => {
+                      const itemTitle = it.product_title || it.title || 'สินค้าแฮนด์เมด';
+                      const itemImg = it.product_image || it.image_url;
+                      const isSelectedForUpdate = selectedProductItem[ord.id] === itemTitle;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-4 rounded-2xl text-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border transition-all ${
+                            isSelectedForUpdate
+                              ? 'bg-emerald-50/70 border-emerald-400 ring-2 ring-emerald-300'
+                              : 'bg-stone-50 border-stone-200/80 hover:border-stone-300'
+                          }`}
+                        >
+                          <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+                            {/* รูปภาพสินค้า */}
+                            {itemImg ? (
+                              <div
+                                onClick={() => setPreviewImage(itemImg)}
+                                className="relative w-16 h-16 rounded-xl overflow-hidden border border-stone-200 shrink-0 bg-white cursor-pointer group shadow-xs"
+                              >
+                                <img
+                                  src={itemImg}
+                                  alt={itemTitle}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                />
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                  <Eye className="w-4 h-4" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-16 h-16 rounded-xl bg-stone-200 flex items-center justify-center text-stone-400 text-[10px] font-mono shrink-0">
+                                NO PIC
+                              </div>
+                            )}
+
+                            <div className="space-y-1 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-display font-bold text-stone-900 text-sm sm:text-base">
+                                  {itemTitle}
+                                </span>
+                                {it.is_made_to_order ? (
+                                  <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                    งานสั่งทำ (Made-to-Order)
+                                  </span>
+                                ) : (
+                                  <span className="bg-stone-100 text-stone-600 border border-stone-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                    สินค้าสำเร็จรูป
+                                  </span>
+                                )}
+                                {it.lead_time_days > 0 && (
+                                  <span className="text-[10px] text-stone-500 font-mono">
+                                    ผลิต ~{it.lead_time_days} วัน
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-stone-500 text-[11px]">
+                                จำนวน: <strong className="font-bold text-stone-800">{it.quantity} ชิ้น</strong> • ราคาชิ้นละ ฿{Number(it.price).toLocaleString()}
+                              </p>
+
+                              {/* แสดงตัวเลือก Customization ที่ลูกค้าเลือก */}
+                              {renderCustomizationDetails(it.customization_details || it.customization_notes)}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-stone-200">
+                            <div className="text-right">
+                              <span className="text-[10px] font-mono text-stone-400 uppercase block">SUBTOTAL</span>
+                              <span className="font-mono font-extrabold text-stone-900 text-base">
+                                ฿{(Number(it.price) * (Number(it.quantity) || 1)).toLocaleString()}
+                              </span>
+                            </div>
+
+                            {/* ปุ่มเลือกสินค้านี้เพื่อไปอัปเดตสเต็ปงานคราฟต์ */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedProductItem(prev => ({
+                                  ...prev,
+                                  [ord.id]: prev[ord.id] === itemTitle ? 'all' : itemTitle
+                                }));
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                isSelectedForUpdate
+                                  ? 'bg-emerald-800 text-white shadow-xs'
+                                  : 'bg-white hover:bg-stone-100 text-stone-700 border border-stone-300'
+                              }`}
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-[#E76F51]" />
+                              <span>{isSelectedForUpdate ? '✓ เลือกชิ้นนี้อยู่' : 'เลือกอัปเดตชิ้นนี้'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* 🎨 Artisan Journal Control Panel */}
@@ -519,6 +621,11 @@ export const ManageOrders = () => {
                       <Sparkles className="w-4 h-4 text-[#E76F51]" />
                       <span>ARTISAN JOURNAL // บันทึกความคืบหน้าส่งตรงถึงลูกค้า</span>
                     </span>
+                    <span className="text-[11px] text-emerald-200 font-mono">
+                      {selectedProductItem[ord.id] && selectedProductItem[ord.id] !== 'all'
+                        ? `🎯 กำลังอัปเดต: ${selectedProductItem[ord.id]}`
+                        : '📦 อัปเดต: ทุกสินค้าในคำสั่งซื้อนี้'}
+                    </span>
                   </div>
 
                   {isCompleted ? (
@@ -527,6 +634,31 @@ export const ManageOrders = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
+                      {/* 0. ตัวเลือกสินค้าที่ต้องการอัปเดตสเต็ป (แบบแยกชิ้นย่อย 1:1) */}
+                      {ord.items && ord.items.length > 1 && (
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-[#FFE6A7]" />
+                            <span>เลือกชิ้นงานที่ต้องการอัปเดตสถานะ (Item Selector):</span>
+                          </label>
+                          <select
+                            value={selectedProductItem[ord.id] || 'all'}
+                            onChange={(e) => setSelectedProductItem({ ...selectedProductItem, [ord.id]: e.target.value })}
+                            className="w-full text-xs p-2.5 bg-white text-stone-900 rounded-xl focus:outline-none font-bold"
+                          >
+                            <option value="all">📦 อัปเดตสินค้าทุกชิ้นในคำสั่งซื้อนี้ (All Items)</option>
+                            {ord.items.map((it, itemIdx) => {
+                              const title = it.product_title || it.title || `สินค้า #${itemIdx + 1}`;
+                              return (
+                                <option key={itemIdx} value={title}>
+                                  🎨 เฉพาะชิ้นงาน: {title} (จำนวน {it.quantity} ชิ้น)
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
+
                       {/* 1. หัวข้อสถานะ/กำลังทำอะไรอยู่ */}
                       <div className="space-y-2">
                         <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
@@ -534,7 +666,11 @@ export const ManageOrders = () => {
                         </label>
                         <input
                           type="text"
-                          placeholder="เช่น กำลังตากดินให้แห้ง, ลงสีเคลือบเงารอบแรก, สลักชื่อไม้..."
+                          placeholder={
+                            selectedProductItem[ord.id] && selectedProductItem[ord.id] !== 'all'
+                              ? `เช่น [${selectedProductItem[ord.id]}] กำลังลงสีเคลือบเงา...`
+                              : "เช่น กำลังตากดินให้แห้ง, ลงสีเคลือบเงารอบแรก, สลักชื่อไม้..."
+                          }
                           value={customTitle[ord.id] || ''}
                           onChange={(e) => setCustomTitle({ ...customTitle, [ord.id]: e.target.value })}
                           className="w-full text-xs p-3 bg-white text-stone-900 rounded-xl focus:outline-none font-bold"
@@ -611,6 +747,38 @@ export const ManageOrders = () => {
                     </div>
                   )}
                 </div>
+
+                {/* 📌 Timeline ประวัติความคืบหน้างานคราฟต์ที่เคยบันทึกไว้ (ตรงกันกับฝั่งผู้ซื้อ 1:1) */}
+                {ord.timeline && ord.timeline.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <span className="text-[10px] font-mono tracking-widest uppercase text-stone-400 font-bold block flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-[#1B4332]" />
+                      <span>CRAFT PROGRESS TIMELINE // ประวัติความคืบหน้า ({ord.timeline.length} รายการ)</span>
+                    </span>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                      {ord.timeline.map((log, logIdx) => (
+                        <div key={logIdx} className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-[#2A9D8F] mt-1.5 shrink-0" />
+                          <div className="flex-1 space-y-0.5">
+                            <span className="font-bold text-stone-900 block">{log.status_title || log.step}</span>
+                            {log.notes && <p className="text-stone-600 font-medium">{log.notes}</p>}
+                            <span className="text-[10px] text-stone-400 font-mono block">
+                              {new Date(log.created_at).toLocaleString('th-TH')}
+                            </span>
+                          </div>
+                          {log.image_url && (
+                            <div
+                              onClick={() => setPreviewImage(log.image_url)}
+                              className="relative w-12 h-12 rounded-lg overflow-hidden border border-stone-200 shrink-0 cursor-pointer shadow-2xs group"
+                            >
+                              <img src={log.image_url} alt="สเต็ปงาน" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

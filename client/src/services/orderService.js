@@ -1,7 +1,13 @@
 import api from './api';
 
+/**
+ * สร้างคำสั่งซื้อใหม่ (รองรับทั้ง FormData สำหรับแนบไฟล์สลิป 'payment_slip' และ JSON Object ทั่วไป)
+ */
 export const createOrder = async (orderData) => {
-  const response = await api.post('/orders', orderData);
+  const isFormData = orderData instanceof FormData;
+  const response = await api.post('/orders', orderData, {
+    headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : {}
+  });
   return response.data;
 };
 
@@ -15,9 +21,12 @@ export const getOrderById = async (id) => {
   return response.data;
 };
 
+/**
+ * อัปโหลดสลิปชำระเงินงวดแรก / เต็มจำนวน (แนบฟิลด์ 'payment_slip')
+ */
 export const uploadPaymentSlip = async (orderId, file) => {
   const formData = new FormData();
-  formData.append('payment_slip', file); // ✅ เปลี่ยนจาก 'slip' เป็น 'payment_slip'
+  formData.append('payment_slip', file);
   const response = await api.post(`/orders/${orderId}/upload-slip`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -31,7 +40,7 @@ export const uploadPaymentSlip = async (orderId, file) => {
  */
 export const uploadFinalPaymentSlip = async (orderId, file) => {
   const formData = new FormData();
-  formData.append('payment_slip', file); // ✅ เปลี่ยนจาก 'slip' เป็น 'payment_slip'
+  formData.append('payment_slip', file);
   const response = await api.post(`/orders/${orderId}/upload-final-slip`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
@@ -40,22 +49,38 @@ export const uploadFinalPaymentSlip = async (orderId, file) => {
   return response.data;
 };
 
+/**
+ * ดึงรายการคำสั่งซื้อฝั่งผู้ขาย (ดึงข้อมูลสลิปทั้งสองงวด สินค้าแยกชิ้นย่อย 1:1 และ Timeline)
+ */
 export const getSellerOrders = async () => {
-  const response = await api.get('/seller/orders');
+  try {
+    const response = await api.get('/seller/orders');
+    return response.data;
+  } catch (err) {
+    const fallbackRes = await api.get('/orders/seller-orders');
+    return fallbackRes.data;
+  }
+};
+
+/**
+ * ผู้ซื้อยืนยันได้รับสินค้าและเสร็จสิ้นคำสั่งซื้อ
+ */
+export const confirmReceivedOrder = async (orderId) => {
+  const response = await api.patch(`/orders/${orderId}/confirm-received`);
   return response.data;
 };
 
-// 🛠️ ปรับปรุงฟังก์ชัน updateCraftStatus ให้แพ็ก FormData ส่งรูปภาพและข้อความได้อย่างแม่นยำ
+/**
+ * อัปเดตสเต็ปงานคราฟต์ / Artisan Journal พร้อมรองรับการแนบรูปภาพความคืบหน้า
+ */
 export const updateCraftStatus = async (orderId, statusData) => {
   let payload = statusData;
   let headers = {};
 
-  // ถ้า statusData เป็น FormData อยู่แล้ว ให้ส่งไปตรงๆ ได้เลย
   if (statusData instanceof FormData) {
     payload = statusData;
     headers = { 'Content-Type': 'multipart/form-data' };
   } else {
-    // ถ้าส่งมาเป็น Object ปกติ ให้ทำการแปลงเป็น FormData เพื่อรองรับไฟล์รูปภาพ
     const formData = new FormData();
     formData.append('craft_status', statusData.craft_status || statusData.step || '');
     formData.append('step_title', statusData.step_title || statusData.status_title || '');

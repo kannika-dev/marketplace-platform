@@ -30,6 +30,38 @@ export const CraftTrackingTab = () => {
     const [issueModalOrder, setIssueModalOrder] = useState(null);
     const [issueText, setIssueText] = useState('');
 
+    const renderCustomizationDetails = (details) => {
+        if (!details) return null;
+        let parsed = details;
+        if (typeof details === 'string') {
+            try {
+                parsed = JSON.parse(details);
+            } catch (e) {
+                return <span>{details}</span>;
+            }
+        }
+
+        if (typeof parsed === 'object' && parsed !== null) {
+            return (
+                <div className="mt-1.5 flex flex-wrap gap-1.5 items-center text-[11px]">
+                    <span className="font-mono text-[#E76F51] font-bold uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles className="w-3 h-3" /> CUSTOM:
+                    </span>
+                    {Object.entries(parsed).map(([key, val]) => (
+                        <span
+                            key={key}
+                            className="bg-[#FFE6A7]/30 text-[#1B4332] border border-[#FFE6A7] px-2 py-0.5 rounded-full font-medium text-[10px]"
+                        >
+                            {key}: <strong className="font-bold">{String(val)}</strong>
+                        </span>
+                    ))}
+                </div>
+            );
+        }
+
+        return <span>{String(parsed)}</span>;
+    };
+
     const fetchTrackingData = async () => {
         try {
             setLoading(true);
@@ -254,19 +286,48 @@ export const CraftTrackingTab = () => {
                                     </div>
                                 </div>
 
-                                {/* รายการสินค้าในออเดอร์นี้ */}
+                                {/* รายการสินค้าในออเดอร์นี้ (แสดงผล 1:1 กับฝั่งช่างฝีมือ) */}
                                 <div className="space-y-2">
-                                    <span className="text-xs font-bold text-stone-700 block">รายการสินค้าในคำสั่งซื้อนี้:</span>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        {order.items?.map((item, idx) => (
-                                            <div key={idx} className="p-2.5 bg-stone-50 rounded-2xl border border-stone-100 flex items-center gap-3 text-xs">
-                                                <img src={item.image_url || 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=150&q=80'} alt={item.title} className="w-10 h-10 rounded-xl object-cover border border-white shrink-0" />
-                                                <div className="truncate">
-                                                    <p className="font-bold text-stone-900 truncate">{item.title}</p>
-                                                    <p className="text-stone-400 text-[11px]">จำนวน: {item.quantity} • ฿{Number(item.price).toLocaleString()}</p>
+                                    <span className="text-xs font-bold text-stone-700 block">
+                                        รายการสินค้าในคำสั่งซื้อนี้ ({order.items?.length || 0} ชิ้น):
+                                    </span>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {order.items?.map((item, idx) => {
+                                            const itemTitle = item.product_title || item.title || 'สินค้าแฮนด์เมด';
+                                            const itemImg = item.product_image || item.image_url;
+
+                                            return (
+                                                <div key={idx} className="p-3 bg-stone-50 rounded-2xl border border-stone-200/80 flex items-start gap-3 text-xs">
+                                                    {itemImg ? (
+                                                        <div
+                                                            onClick={() => setPreviewImage(itemImg)}
+                                                            className="relative w-14 h-14 rounded-xl overflow-hidden border border-stone-200 shrink-0 bg-white cursor-pointer group shadow-2xs"
+                                                        >
+                                                            <img
+                                                                src={itemImg}
+                                                                alt={itemTitle}
+                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                                            />
+                                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                                                <Eye className="w-3.5 h-3.5" />
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-14 h-14 rounded-xl bg-stone-200 flex items-center justify-center text-stone-400 text-[10px] font-mono shrink-0">
+                                                            NO PIC
+                                                        </div>
+                                                    )}
+
+                                                    <div className="min-w-0 flex-1 space-y-0.5">
+                                                        <p className="font-bold text-stone-900 truncate text-sm">{itemTitle}</p>
+                                                        <p className="text-stone-500 text-[11px]">
+                                                            จำนวน: <strong className="text-stone-800">{item.quantity}</strong> • ฿{Number(item.price).toLocaleString()}
+                                                        </p>
+                                                        {renderCustomizationDetails(item.customization_details || item.customization_notes)}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
 

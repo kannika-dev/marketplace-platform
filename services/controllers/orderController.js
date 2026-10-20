@@ -98,23 +98,47 @@ export const createOrder = async (req, res) => {
     for (const [sellerId, group] of Object.entries(itemsBySeller)) {
       const overallPaymentType = group.hasDeposit ? 'deposit' : 'full';
       const initialStatus = slipUrl ? 'pending_verification' : 'unpaid';
+      const initialPaymentStatus = slipUrl ? 'pending_verification' : 'unpaid';
+      const initialCraftStatus = slipUrl ? 'pending_verification' : 'order_placed';
 
-      const [orderResult] = await connection.query(
-        `INSERT INTO orders (buyer_id, seller_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, payment_slip_url, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [
-          buyerId,
-          sellerId,
-          group.totalAmount,
-          initialStatus,
-          shipping_address || '',
-          overallPaymentType,
-          payment_method || 'bank_transfer',
-          group.depositAmount,
-          group.remainingBalance,
-          slipUrl || null // ✅ บันทึกลง payment_slip_url ตั้งแต่แรก
-        ]
-      );
+      let orderResult;
+      try {
+        [orderResult] = await connection.query(
+          `INSERT INTO orders (buyer_id, seller_id, total_amount, status, payment_status, craft_status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, payment_slip_url, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            buyerId,
+            sellerId,
+            group.totalAmount,
+            initialStatus,
+            initialPaymentStatus,
+            initialCraftStatus,
+            shipping_address || '',
+            overallPaymentType,
+            payment_method || 'bank_transfer',
+            group.depositAmount,
+            group.remainingBalance,
+            slipUrl || null
+          ]
+        );
+      } catch (insertErr) {
+        [orderResult] = await connection.query(
+          `INSERT INTO orders (buyer_id, seller_id, total_amount, status, shipping_address, payment_type, payment_method, deposit_amount, remaining_balance, payment_slip_url, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            buyerId,
+            sellerId,
+            group.totalAmount,
+            initialStatus,
+            shipping_address || '',
+            overallPaymentType,
+            payment_method || 'bank_transfer',
+            group.depositAmount,
+            group.remainingBalance,
+            slipUrl || null
+          ]
+        );
+      }
 
       const orderId = orderResult.insertId;
       createdOrders.push(orderId);
@@ -130,7 +154,7 @@ export const createOrder = async (req, res) => {
 
       // 4. บันทึก Timeline เริ่มต้นใน craft_tracking_logs
       const logTitle = slipUrl ? 'ส่งหลักฐานการชำระเงินแล้ว' : 'คำสั่งซื้อถูกส่งเรียบร้อย';
-      const logNotes = slipUrl ? 'ร้านค้ากำลังตรวจสอบสลิปโอนเงิน' : 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน';
+      const logNotes = slipUrl ? 'ผู้ซื้อแนบสลิปโอนเงินเรียบร้อยแล้ว ร้านค้ากำลังตรวจสอบความถูกต้อง' : 'รอการชำระเงินและตรวจสอบสลิปโอนเงิน';
 
       await connection.query(
         `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
@@ -293,33 +317,44 @@ export const uploadPaymentSlip = async (req, res) => {
     const { id } = req.params;
     const buyerId = req.user.id;
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please attach payment slip image.' });
+    let slipUrl = null;
+    if (req.file) {
+      slipUrl = getSecureCloudinaryUrl(req.file);
+    } else if (req.body.payment_slip_url || req.body.slip_url) {
+      slipUrl = req.body.payment_slip_url || req.body.slip_url;
     }
 
-    const slipUrl = getSecureCloudinaryUrl(req.file);
+    if (!slipUrl) {
+      return res.status(400).json({ success: false, message: 'กรุณาแนบรูปภาพสลิปการโอนเงิน (Please attach payment slip image).' });
+    }
 
-    const [result] = await pool.query(
-      `UPDATE orders 
-       SET payment_slip_url = ?, status = 'pending_verification' 
-       WHERE id = ? AND buyer_id = ?`,
-      [slipUrl, id, buyerId]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: 'Order not found or unauthorized.' });
+    try {
+      await pool.query(
+        `UPDATE orders 
+         SET payment_slip_url = ?, status = 'pending_verification', payment_status = 'pending_verification', craft_status = 'pending_verification' 
+         WHERE id = ? AND buyer_id = ?`,
+        [slipUrl, id, buyerId]
+      );
+    } catch (e) {
+      await pool.query(
+        `UPDATE orders 
+         SET payment_slip_url = ?, status = 'pending_verification' 
+         WHERE id = ? AND buyer_id = ?`,
+        [slipUrl, id, buyerId]
+      );
     }
 
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
-       VALUES (?, 'payment_uploaded', 'ส่งหลักฐานการชำระเงินแล้ว', 'รอเจ้าหน้าที่แอดมินหรือร้านค้าตรวจสอบสลิปโอนเงิน', NULL, NOW())`,
-      [id]
+       VALUES (?, 'payment_uploaded', 'ส่งหลักฐานการชำระเงินแล้ว', 'ผู้ซื้อแนบสลิปใหม่เรียบร้อยแล้ว รอร้านค้าตรวจสอบความถูกต้อง', ?, NOW())`,
+      [id, slipUrl]
     );
 
     return res.json({
       success: true,
-      message: 'Slip uploaded successfully. Waiting for verification.',
-      slip_url: slipUrl
+      message: 'แนบสลิปเรียบร้อยแล้ว รอการตรวจสอบความถูกต้อง',
+      slip_url: slipUrl,
+      payment_slip_url: slipUrl
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -334,11 +369,16 @@ export const uploadFinalPaymentSlip = async (req, res) => {
     const { id } = req.params;
     const buyerId = req.user.id;
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: 'Please attach final payment slip image.' });
+    let slipUrl = null;
+    if (req.file) {
+      slipUrl = getSecureCloudinaryUrl(req.file);
+    } else if (req.body.payment_slip_url || req.body.final_payment_slip_url || req.body.slip_url) {
+      slipUrl = req.body.payment_slip_url || req.body.final_payment_slip_url || req.body.slip_url;
     }
 
-    const slipUrl = getSecureCloudinaryUrl(req.file);
+    if (!slipUrl) {
+      return res.status(400).json({ success: false, message: 'กรุณาแนบรูปภาพสลิปยอดคงเหลือ (Please attach final payment slip image).' });
+    }
 
     const [result] = await pool.query(
       `UPDATE orders 
@@ -411,5 +451,56 @@ export const confirmReceivedOrder = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   } finally {
     connection.release();
+  }
+};
+
+/**
+ * Get orders for seller (ดึงรายการออเดอร์, ข้อมูลสลิปทั้งงวดแรกและงวดสอง, สินค้าแยกชิ้นย่อย 1:1, และ Timeline)
+ */
+export const getSellerOrders = async (req, res) => {
+  try {
+    const sellerId = req.params.sellerId || req.user.id;
+
+    const [orders] = await pool.query(
+      `SELECT DISTINCT o.id, o.buyer_id, o.seller_id, o.status, o.payment_status, o.craft_status, o.total_amount, 
+              o.shipping_address, o.payment_slip_url, o.final_payment_slip_url, 
+              o.payment_type, o.deposit_amount, o.remaining_balance, o.created_at, 
+              COALESCE(u.name, 'ผู้ซื้อทั่วไป') as buyer_name, u.email as buyer_email
+       FROM orders o
+       LEFT JOIN users u ON o.buyer_id = u.id
+       WHERE o.seller_id = ? OR o.id IN (
+         SELECT oi.order_id FROM order_items oi 
+         JOIN products p ON oi.product_id = p.id 
+         WHERE p.seller_id = ?
+       )
+       ORDER BY o.created_at DESC`,
+      [sellerId, sellerId]
+    );
+
+    for (const ord of orders) {
+      const [items] = await pool.query(
+        `SELECT oi.*, p.title, p.image_url, p.is_made_to_order, p.lead_time_days,
+                p.title AS product_title, p.image_url AS product_image
+         FROM order_items oi
+         JOIN products p ON oi.product_id = p.id
+         WHERE oi.order_id = ? AND (p.seller_id = ? OR oi.seller_id = ?)`,
+        [ord.id, sellerId, sellerId]
+      );
+      ord.items = items;
+
+      const [timeline] = await pool.query(
+        `SELECT id, order_id, step, status_title, notes, image_url, created_at 
+         FROM craft_tracking_logs 
+         WHERE order_id = ? 
+         ORDER BY created_at ASC`,
+        [ord.id]
+      );
+      ord.timeline = timeline;
+    }
+
+    return res.json({ success: true, data: orders });
+  } catch (error) {
+    console.error('getSellerOrders Error:', error);
+    return res.status(500).json({ success: false, message: error.message });
   }
 };

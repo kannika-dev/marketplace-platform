@@ -202,16 +202,14 @@ export const Checkout = () => {
       }));
       formData.append('items', JSON.stringify(itemsPayload));
 
-      // แนบไฟล์สลิปของร้านแรก (หรือดึงตาม sellerId หลัก)
+      // แนบไฟล์สลิปของร้านแรก หรือดึงจากรายการสลิปที่มีการอัปโหลด
       const firstSellerId = Object.keys(groupedBySeller)[0];
-      const mainSlipFile = slipFiles[firstSellerId];
+      const mainSlipFile = slipFiles[firstSellerId] || Object.values(slipFiles)[0];
       if (mainSlipFile) {
-        formData.append('payment_slip', mainSlipFile); // ✅ ส่งฟิลด์ payment_slip ไปพร้อมสร้างออร์เดอร์
+        formData.append('payment_slip', mainSlipFile); // ✅ แนบฟิลด์ payment_slip ไปพร้อมกับการสร้างคำสั่งซื้อ
       }
 
-      await api.post('/orders', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      await createOrder(formData);
 
       clearCart();
       alert(`✨ สร้างคำสั่งซื้อและแนบสลิปสำเร็จ! กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);

@@ -755,7 +755,7 @@ export const deleteProduct = async (req, res) => {
 };
 
 /**
- * Get orders that involve this seller's products (รองรับระบบชำระเงิน 2 งวดและสลิปรอบสอง)
+ * Get orders that involve this seller's products (รองรับระบบชำระเงิน 2 งวด สลิปรอบสอง สินค้ารายชิ้น 1:1 และ Timeline)
  */
 export const getSellerOrders = async (req, res) => {
   try {
@@ -780,13 +780,23 @@ export const getSellerOrders = async (req, res) => {
 
     for (const ord of orders) {
       const [items] = await pool.query(
-        `SELECT oi.*, p.title, p.image_url 
+        `SELECT oi.*, p.title, p.image_url, p.is_made_to_order, p.lead_time_days,
+                p.title AS product_title, p.image_url AS product_image
          FROM order_items oi
          JOIN products p ON oi.product_id = p.id
-         WHERE oi.order_id = ? AND p.seller_id = ?`,
-        [ord.id, sellerId]
+         WHERE oi.order_id = ? AND (p.seller_id = ? OR oi.seller_id = ?)`,
+        [ord.id, sellerId, sellerId]
       );
       ord.items = items;
+
+      const [timeline] = await pool.query(
+        `SELECT id, order_id, step, status_title, notes, image_url, created_at 
+         FROM craft_tracking_logs 
+         WHERE order_id = ? 
+         ORDER BY created_at ASC`,
+        [ord.id]
+      );
+      ord.timeline = timeline;
     }
 
     return res.json({ success: true, data: orders });
