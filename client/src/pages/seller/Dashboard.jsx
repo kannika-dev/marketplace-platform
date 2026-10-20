@@ -5,7 +5,7 @@ import api from '../../services/api';
 import ImageUploadDropzone from '../../components/common/ImageUploadDropzone';
 import {
   DollarSign, ShoppingBag, Package, Hammer,
-  TrendingUp, Plus, CheckCircle, Store, Loader2, AlertCircle, MessageSquare, Send, Sparkles, ChevronRight
+  TrendingUp, Plus, CheckCircle, Store, Loader2, AlertCircle, MessageSquare, Send, Sparkles, ChevronRight, Image as ImageIcon
 } from 'lucide-react';
 
 function Dashboard() {
@@ -66,7 +66,9 @@ function Dashboard() {
       }
       if (shopRes.status === 'fulfilled') {
         const body = shopRes.value?.data;
-        setShopInfo(body ?? null);
+        // ✅ แกะข้อมูลร้านค้าและรูปภาพแบนเนอร์/โลโก้ให้ยืดหยุ่นถูกต้อง
+        const actualShop = body?.data ?? body ?? null;
+        setShopInfo(actualShop);
       }
       if (reviewsRes.status === 'fulfilled') {
         const body = reviewsRes.value?.data;
@@ -207,7 +209,7 @@ function Dashboard() {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8 text-stone-800 relative">
 
-      {/* 🌿 ส่วนหัวโปรไฟล์สตูดิโอ */}
+      {/* 🌿 ส่วนหัวโปรไฟล์สตูดิโอ (รองรับการดึงแบนเนอร์และโลโก้จาก shopInfo) */}
       <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-xs">
         <div className="h-48 w-full bg-stone-200 relative">
           {shopInfo?.banner_url ? (
@@ -389,7 +391,7 @@ function Dashboard() {
           </div>
         )}
 
-        {/* TAB: คำสั่งซื้อทั้งหมด */}
+        {/* TAB: คำสั่งซื้อทั้งหมด (พร้อมแสดงหลักฐานสลิปโอนเงิน) */}
         {activeTab === 'orders' && (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -411,11 +413,27 @@ function Dashboard() {
             ) : (
               <div className="space-y-3">
                 {orders.map((ord) => (
-                  <div key={ord.id} className="p-4 rounded-xl border border-stone-200 bg-stone-50 flex justify-between items-center">
+                  <div key={ord.id} className="p-4 rounded-xl border border-stone-200 bg-stone-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                       <span className="font-bold text-sm block text-stone-900">คำสั่งซื้อ #{ord.id}</span>
                       <span className="text-xs text-stone-500">ลูกค้า: {ord.buyer_name || 'ผู้ซื้อทั่วไป'} | ยอดรวม: ฿{ord.total_amount}</span>
+
+                      {/* ✅ แสดงภาพสลิปโอนเงินถ้ามี */}
+                      {ord.payment_slip_url && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-emerald-700" />
+                          <a
+                            href={ord.payment_slip_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-emerald-800 font-bold underline hover:text-emerald-900"
+                          >
+                            ดูหลักฐานสลิปโอนเงิน (Payment Slip)
+                          </a>
+                        </div>
+                      )}
                     </div>
+
                     <div className="flex items-center gap-3">
                       <span className={`text-xs px-3 py-1 rounded-full font-bold ${ord.status === 'completed' || ord.craft_status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
                         ord.craft_status || ord.status ? 'bg-purple-100 text-purple-900' : 'bg-stone-200 text-stone-700'

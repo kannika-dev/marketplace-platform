@@ -10,7 +10,6 @@ import {
     Eye,
     X,
     Image as ImageIcon,
-    Lock,
     CheckCircle,
     AlertTriangle,
     RefreshCw,
@@ -49,7 +48,7 @@ export const CraftTrackingTab = () => {
         fetchTrackingData();
     }, []);
 
-    // ฟังก์ชันอัปโหลดสลิปงวดแรก
+    // ฟังก์ชันอัปโหลดสลิปงวดแรก (กรณีแก้ไขสลิปเดิมที่ไม่ถูกต้อง)
     const handleUploadSlip = async (orderId, event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -57,7 +56,7 @@ export const CraftTrackingTab = () => {
         try {
             const res = await uploadPaymentSlip(orderId, file);
             if (res.success) {
-                alert('✨ อัปโหลดสลิปมัดจำสำเร็จ! ระบบส่งหลักฐานให้ช่างฝีมือตรวจสอบ');
+                alert('✨ อัปโหลดสลิปใหม่สำเร็จ! ระบบส่งหลักฐานให้ช่างฝีมือตรวจสอบอีกครั้ง');
                 fetchTrackingData();
             }
         } catch (err) {
@@ -66,7 +65,7 @@ export const CraftTrackingTab = () => {
         }
     };
 
-    // ฟังก์ชันอัปโหลดสลิปงวดที่ 2 (ยอดคงเหลือ)
+    // ฟังก์ชันอัปโหลดสลิปงวดที่ 2 (ยอดคงเหลือสำหรับสินค้ามัดจำ)
     const handleUploadFinalSlip = async (orderId, event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -83,7 +82,7 @@ export const CraftTrackingTab = () => {
         }
     };
 
-    // 1. ฟังก์ชันผู้ซื้อกด "ยืนยันได้รับสินค้าและเสร็จสิ้น"
+    // ฟังก์ชันผู้ซื้อกด "ยืนยันได้รับสินค้าและเสร็จสิ้น"
     const handleConfirmReceived = async (orderId) => {
         if (!window.confirm('คุณได้รับสินค้าถูกต้องและสมบูรณ์แล้วใช่หรือไม่?')) return;
 
@@ -103,7 +102,7 @@ export const CraftTrackingTab = () => {
         }
     };
 
-    // 2. ฟังก์ชันผู้ซื้อยิงแจ้งปัญหาเข้าบันทึก Log
+    // ฟังก์ชันผู้ซื้อยิงแจ้งปัญหาเข้าบันทึก Log
     const handleReportIssue = async () => {
         if (!issueText || !issueText.trim()) {
             alert('กรุณาระบุรายละเอียดปัญหาที่พบ');
@@ -202,7 +201,6 @@ export const CraftTrackingTab = () => {
                                             <span className="text-stone-400">({new Date(order.created_at).toLocaleDateString('th-TH')})</span>
                                         </div>
 
-                                        {/* 👈 เพิ่มแสดงชื่อร้านค้าในออเดอร์นี้ */}
                                         <div className="flex items-center gap-1.5 text-[#2A9D8F] font-bold">
                                             <Store className="w-3.5 h-3.5" />
                                             <span>ร้านค้า: {order.shop_name || 'ร้านค้าแฮนด์เมด'}</span>
@@ -294,7 +292,7 @@ export const CraftTrackingTab = () => {
                                         <p className="text-stone-500 whitespace-pre-line">{order.shipping_address}</p>
                                     </div>
 
-                                    {/* สถานะชำระเงิน & ช่องแนบสลิป */}
+                                    {/* สถานะชำระเงิน & หลักฐาน (เน้นแสดงสลิป และเปิดช่องอัปโหลดเฉพาะกรณีสลิปมีปัญหา หรือร้านเรียกเก็บงวดที่ 2) */}
                                     <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-xs space-y-3 flex flex-col justify-between">
                                         <div className="space-y-1.5">
                                             <span className="font-bold text-stone-800 block">สถานะการชำระเงิน &amp; หลักฐาน:</span>
@@ -328,26 +326,6 @@ export const CraftTrackingTab = () => {
                                                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
                                                 </label>
                                             </div>
-                                        ) : hasUploadedSlip && !isPaymentVerified ? (
-                                            <div className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-2.5 overflow-hidden">
-                                                    <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-stone-200 shrink-0 bg-stone-100">
-                                                        <img src={order.payment_slip_url} alt="สลิป" className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <div className="truncate">
-                                                        <span className="text-[11px] font-bold text-amber-700 block">🟡 แนบสลิปมัดจำแล้ว (รอตรวจ)</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <button type="button" onClick={() => setPreviewImage(order.payment_slip_url)} className="p-1.5 bg-stone-100 text-stone-600 hover:text-[#2A9D8F] rounded-lg cursor-pointer" title="ดูสลิป">
-                                                        <Eye className="w-4 h-4" />
-                                                    </button>
-                                                    <label className="p-1.5 bg-stone-100 hover:bg-amber-50 text-stone-600 hover:text-amber-700 rounded-lg cursor-pointer transition-colors" title="เปลี่ยนรูปสลิป">
-                                                        <Upload className="w-4 h-4" />
-                                                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
-                                                    </label>
-                                                </div>
-                                            </div>
                                         ) : isDeposit && isAwaitingFinalPayment ? (
                                             <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 space-y-2.5">
                                                 <div className="flex items-center justify-between text-xs">
@@ -356,7 +334,7 @@ export const CraftTrackingTab = () => {
                                                 </div>
 
                                                 {hasUploadedFinalSlip && !isFinalPaymentVerified ? (
-                                                    <div className="p-2 bg-white rounded-xl border border-stone-200 flex items-center justify-between">
+                                                    <div className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between">
                                                         <span className="text-[11px] font-bold text-amber-800">🟡 แนบสลิปงวดที่ 2 แล้ว (รอร้านตรวจสอบ)</span>
                                                         <button type="button" onClick={() => setPreviewImage(order.final_payment_slip_url)} className="p-1 bg-stone-100 rounded-lg cursor-pointer">
                                                             <Eye className="w-4 h-4" />
@@ -381,24 +359,30 @@ export const CraftTrackingTab = () => {
                                                     </label>
                                                 )}
                                             </div>
-                                        ) : isPaymentVerified ? (
-                                            <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between gap-3">
-                                                <span className="text-[11px] font-bold text-emerald-800 flex items-center gap-1">
-                                                    <CheckCircle className="w-4 h-4 text-emerald-600" /> สลิปถูกต้อง ตรวจสอบเรียบร้อยแล้ว
-                                                </span>
-                                                {order.payment_slip_url && (
-                                                    <button type="button" onClick={() => setPreviewImage(order.payment_slip_url)} className="p-1.5 bg-white text-stone-600 hover:text-[#2A9D8F] rounded-lg cursor-pointer border border-stone-200">
-                                                        <Eye className="w-4 h-4" />
-                                                    </button>
-                                                )}
+                                        ) : hasUploadedSlip ? (
+                                            // 📌 กรณีแนบสลิปมาแล้ว แสดงตัวอย่างสลิปและปุ่มดูรูป (ไม่ต้องมีช่องอัปโหลดเกะกะ)
+                                            <div className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-2.5 overflow-hidden">
+                                                    <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-stone-200 shrink-0 bg-stone-100">
+                                                        <img src={order.payment_slip_url} alt="สลิป" className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <span className="text-[11px] font-bold text-stone-800 block">หลักฐานสลิปโอนเงิน</span>
+                                                        <span className="text-[10px] text-emerald-700 font-medium">
+                                                            {isPaymentVerified ? '✓ ตรวจสอบเรียบร้อย' : '🟡 รอร้านค้าตรวจสอบ'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPreviewImage(order.payment_slip_url)}
+                                                    className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                                >
+                                                    <Eye className="w-3.5 h-3.5 text-[#2A9D8F]" />
+                                                    <span>ดูสลิป</span>
+                                                </button>
                                             </div>
-                                        ) : (
-                                            <label className="w-full py-2.5 px-4 btn-3d-peach text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-                                                <Upload className="w-4 h-4" />
-                                                <span>แนบสลิปชำระเงิน ({isDeposit ? 'มัดจำ 50%' : 'ยอดเต็ม'})</span>
-                                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadSlip(order.id, e)} />
-                                            </label>
-                                        )}
+                                        ) : null}
                                     </div>
                                 </div>
 
