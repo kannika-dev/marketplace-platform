@@ -203,13 +203,30 @@ export const getMyOrders = async (req, res) => {
 
     for (const order of orders) {
       const [items] = await pool.query(
-        `SELECT oi.*, p.title, p.image_url, p.seller_id, s.shop_name 
+        `SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price, oi.customization_notes,
+                p.title, p.image_url, p.seller_id, p.is_made_to_order, p.lead_time_days,
+                p.title AS product_title, p.image_url AS product_image,
+                s.shop_name 
          FROM order_items oi
          LEFT JOIN products p ON oi.product_id = p.id
          LEFT JOIN shops s ON p.seller_id = s.seller_id
          WHERE oi.order_id = ?`,
         [order.id]
       );
+
+      for (const it of items) {
+        it.product_title = it.product_title || it.title;
+        it.product_image = it.product_image || it.image_url;
+        if (it.customization_notes && typeof it.customization_notes === 'string') {
+          try {
+            it.customization_details = JSON.parse(it.customization_notes);
+          } catch (e) {
+            it.customization_details = it.customization_notes;
+          }
+        } else {
+          it.customization_details = it.customization_notes || null;
+        }
+      }
 
       const [logs] = await pool.query(
         `SELECT id, order_id, step, status_title, notes, image_url, created_at 
@@ -281,13 +298,30 @@ export const getOrderById = async (req, res) => {
     }
 
     const [items] = await pool.query(
-      `SELECT oi.*, p.title, p.image_url, p.lead_time_days, p.is_made_to_order, p.seller_id, s.shop_name 
+      `SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price, oi.customization_notes,
+              p.title, p.image_url, p.lead_time_days, p.is_made_to_order, p.seller_id,
+              p.title AS product_title, p.image_url AS product_image,
+              s.shop_name 
        FROM order_items oi
        LEFT JOIN products p ON oi.product_id = p.id
        LEFT JOIN shops s ON p.seller_id = s.seller_id
        WHERE oi.order_id = ?`,
       [id]
     );
+
+    for (const it of items) {
+      it.product_title = it.product_title || it.title;
+      it.product_image = it.product_image || it.image_url;
+      if (it.customization_notes && typeof it.customization_notes === 'string') {
+        try {
+          it.customization_details = JSON.parse(it.customization_notes);
+        } catch (e) {
+          it.customization_details = it.customization_notes;
+        }
+      } else {
+        it.customization_details = it.customization_notes || null;
+      }
+    }
 
     const [timeline] = await pool.query(
       `SELECT id, order_id, step, status_title, notes, image_url, created_at 
@@ -461,10 +495,12 @@ export const getSellerOrders = async (req, res) => {
   try {
     const sellerId = req.params.sellerId || req.user.id;
 
+    // ✅ ดึงข้อมูลออเดอร์ตามโครงสร้างตาราง orders จริง 100%
     const [orders] = await pool.query(
-      `SELECT DISTINCT o.id, o.buyer_id, o.seller_id, o.status, o.payment_status, o.craft_status, o.total_amount, 
-              o.shipping_address, o.payment_slip_url, o.final_payment_slip_url, 
-              o.payment_type, o.deposit_amount, o.remaining_balance, o.created_at, 
+      `SELECT DISTINCT o.id, o.buyer_id, o.seller_id, o.total_amount, o.status, 
+              o.payment_slip_url, o.shipping_address, o.created_at, 
+              o.payment_status, o.craft_status, o.payment_method, o.payment_type, 
+              o.deposit_amount, o.remaining_balance, o.final_payment_slip_url,
               COALESCE(u.name, 'ผู้ซื้อทั่วไป') as buyer_name, u.email as buyer_email
        FROM orders o
        LEFT JOIN users u ON o.buyer_id = u.id
@@ -478,16 +514,33 @@ export const getSellerOrders = async (req, res) => {
     );
 
     for (const ord of orders) {
+      // ✅ ดึงข้อมูล order_items โดย JOIN products และไม่อ้างอิง oi.seller_id
       const [items] = await pool.query(
-        `SELECT oi.*, p.title, p.image_url, p.is_made_to_order, p.lead_time_days,
+        `SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price, oi.customization_notes,
+                p.title, p.image_url, p.is_made_to_order, p.lead_time_days,
                 p.title AS product_title, p.image_url AS product_image
          FROM order_items oi
          JOIN products p ON oi.product_id = p.id
-         WHERE oi.order_id = ? AND (p.seller_id = ? OR oi.seller_id = ?)`,
-        [ord.id, sellerId, sellerId]
+         WHERE oi.order_id = ? AND p.seller_id = ?`,
+        [ord.id, sellerId]
       );
+
+      for (const it of items) {
+        it.product_title = it.product_title || it.title;
+        it.product_image = it.product_image || it.image_url;
+        if (it.customization_notes && typeof it.customization_notes === 'string') {
+          try {
+            it.customization_details = JSON.parse(it.customization_notes);
+          } catch (e) {
+            it.customization_details = it.customization_notes;
+          }
+        } else {
+          it.customization_details = it.customization_notes || null;
+        }
+      }
       ord.items = items;
 
+      // ✅ ดึงประวัติจาก craft_tracking_logs ตามโครงสร้างจริง 100%
       const [timeline] = await pool.query(
         `SELECT id, order_id, step, status_title, notes, image_url, created_at 
          FROM craft_tracking_logs 
