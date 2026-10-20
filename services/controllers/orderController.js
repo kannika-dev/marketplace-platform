@@ -100,12 +100,12 @@ export const createOrder = async (req, res) => {
       const orderId = orderResult.insertId;
       createdOrders.push(orderId);
 
-      // 3. บันทึก order_items สำหรับร้านค้านี้
+      // 3. บันทึก order_items สำหรับร้านค้านี้ (เอา payment_type ออกเพราะตาราง order_items ไม่มีคอลัมน์นี้)
       for (const it of group.items) {
         await connection.query(
-          `INSERT INTO order_items (order_id, product_id, quantity, price, payment_type, customization_notes)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [orderId, it.product_id, it.quantity, it.price, it.payment_type, it.customization_notes]
+          `INSERT INTO order_items (order_id, product_id, quantity, price, customization_notes)
+           VALUES (?, ?, ?, ?, ?)`,
+          [orderId, it.product_id, it.quantity, it.price, it.customization_notes]
         );
       }
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
-import axios from 'axios';
+import api from '../services/api'; // ใช้ api instance ที่ตั้งค่า baseURL ไว้แล้ว
 import {
   ShieldCheck,
   CreditCard,
@@ -41,9 +41,9 @@ export const Checkout = () => {
   const [postalCode, setPostalCode] = useState('');
   const [note, setNote] = useState('');
 
-  // Slip upload state
-  const [slipFile, setSlipFile] = useState(null);
-  const [slipPreview, setSlipPreview] = useState(null);
+  // Slip upload state (แยกเก็บตาม sellerId)
+  const [slipFiles, setSlipFiles] = useState({});
+  const [slipPreviews, setSlipPreviews] = useState({});
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -78,7 +78,7 @@ export const Checkout = () => {
     return acc;
   }, {});
 
-  // ดึงข้อมูลร้านค้าทั้งหมดที่อยู่ในตะกร้าจาก Backend (แบบยืดหยุ่นรองรับทุกโครงสร้าง)
+  // ดึงข้อมูลร้านค้าทั้งหมดที่อยู่ในตะกร้าจาก Backend ผ่าน api instance
   useEffect(() => {
     const fetchAllShops = async () => {
       const sellerIds = Object.keys(groupedBySeller);
@@ -87,7 +87,7 @@ export const Checkout = () => {
 
       for (const sId of sellerIds) {
         try {
-          const res = await axios.get(`/api/shops/seller/${sId}`);
+          const res = await api.get(`/shops/seller/${sId}`);
           const shopData = res.data?.data || res.data;
 
           if (shopData) {
@@ -138,11 +138,11 @@ export const Checkout = () => {
     }, 2000);
   };
 
-  const handleSlipChange = (e) => {
+  const handleSlipChange = (sellerId, e) => {
     const file = e.target.files[0];
     if (file) {
-      setSlipFile(file);
-      setSlipPreview(URL.createObjectURL(file));
+      setSlipFiles(prev => ({ ...prev, [sellerId]: file }));
+      setSlipPreviews(prev => ({ ...prev, [sellerId]: URL.createObjectURL(file) }));
     }
   };
 
@@ -201,18 +201,27 @@ export const Checkout = () => {
       };
 
       const res = await createOrder(orderPayload);
-      const createdOrderId = res.data?.data?.createdOrders?.[0] || res.data?.data?.orderId;
+      const createdOrders = res.data?.data?.createdOrders || [];
+      const singleOrderId = res.data?.data?.orderId;
 
-      if (slipFile && createdOrderId) {
-        const formData = new FormData();
-        formData.append('slip', slipFile);
-        await axios.post(`/api/orders/${createdOrderId}/upload-slip`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+      // อัปโหลดสลิปแยกตามร้านค้าที่สร้างขึ้นมา
+      const sellerIds = Object.keys(groupedBySeller);
+      for (let i = 0; i < sellerIds.length; i++) {
+        const sId = sellerIds[i];
+        const fileToUpload = slipFiles[sId];
+        const targetOrderId = createdOrders[i] || singleOrderId;
+
+        if (fileToUpload && targetOrderId) {
+          const formData = new FormData();
+          formData.append('slip', fileToUpload);
+          await api.post(`/orders/${targetOrderId}/upload-slip`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+        }
       }
 
       clearCart();
-      alert(`✨ สร้างคำสั่งซื้อแยกตามร้านค้าสำเร็จ! กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);
+      alert(`✨ สร้างคำสั่งซื้อแยกตามร้านค้าและอัปโหลดสลิปสำเร็จ! กำลังพาท่านไปที่หน้าติดตามสินค้า (Craft Tracker)...`);
       navigate('/buyer-dashboard?tab=tracker');
     } catch (err) {
       console.error('Place order error:', err);
@@ -496,7 +505,7 @@ export const Checkout = () => {
                           <div className="w-28 h-28 bg-[#E8F7F3] rounded-2xl border border-[#A2D9D2] flex items-center justify-center p-2 shrink-0 overflow-hidden">
                             {shop.qr_code_url ? (
                               <img
-                                src={shop.qr_code_url.startsWith('http') ? shop.qr_code_url : `http://localhost:5000${shop.qr_code_url}`}
+                                src={shop.qr_code_url.startsWith('http') ? shop.qr_code_url : `https://marketplace-platform-yzsx.onrender.com${shop.qr_code_url}`}
                                 alt="PromptPay QR"
                                 className="w-full h-full object-cover rounded-xl"
                                 onError={(e) => {
@@ -535,7 +544,7 @@ export const Checkout = () => {
             )}
           </div>
 
-          {/* STEP 3: Review & Upload Slip */}
+          {/* STEP 3: Review & Upload Slip (แยกตามร้านค้า) */}
           <div className={`clay-card rounded-3xl border transition-all overflow-hidden ${currentStep === 3 ? 'border-[#2A9D8F] ring-2 ring-[#2A9D8F]/20' : 'border-white'}`}>
             <button
               type="button"
@@ -548,10 +557,10 @@ export const Checkout = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-display font-bold text-stone-900">
-                    ตรวจสอบคำสั่งซื้อและแนบสลิปชำระเงิน (Review & Slip Upload)
+                    ตรวจสอบคำสั่งซื้อและแนบสลิปชำระเงินแยกตามร้านค้า (Review & Slip Upload)
                   </h3>
                   <p className="text-xs text-stone-500 font-normal">
-                    แนบหลักฐานการโอนเงินเพื่อส่งตรวจและเริ่มงานคราฟต์ทันที
+                    แนบหลักฐานการโอนเงินให้ครบทุกร้านเพื่อส่งตรวจและเริ่มงานคราฟต์
                   </p>
                 </div>
               </div>
@@ -563,31 +572,50 @@ export const Checkout = () => {
                 <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 text-xs space-y-2 text-stone-700">
                   <div className="flex items-center gap-2 text-[#2A9D8F] font-bold">
                     <HeartHandshake className="w-4 h-4" />
-                    <span>แนบหลักฐานการชำระเงิน (งวดแรก / เต็มจำนวน)</span>
+                    <span>แนบหลักฐานการชำระเงินแยกตามบัญชีร้านค้า</span>
                   </div>
                   <p className="text-[11px] leading-relaxed text-stone-600">
-                    กรุณาแนบสลิปโอนเงินยอดรวม <strong>฿{totalDueNow.toLocaleString()}</strong> เพื่อให้ร้านค้าตรวจสอบและเริ่มเข้าสู่กระบวนการผลิตใน Craft Tracker ทันที
+                    เนื่องจากสินค้ามาจากหลายร้านค้า กรุณาโอนเงินและแนบสลิปแยกตามยอดชำระของแต่ละร้านด้านล่างนี้ค่ะ
                   </p>
                 </div>
 
-                {/* ส่วนอัปโหลดรูปสลิป */}
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-stone-800 block">อัปโหลดสลิปโอนเงิน (Payment Slip) *</label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex-1 flex flex-col items-center justify-center p-6 border-2 border-dashed border-emerald-200 rounded-2xl bg-white hover:bg-emerald-50/50 transition-colors cursor-pointer">
-                      <Upload className="w-6 h-6 text-[#2A9D8F] mb-2" />
-                      <span className="text-xs font-bold text-stone-700">คลิกเพื่อเลือกไฟล์รูปภาพสลิป</span>
-                      <span className="text-[10px] text-stone-400 mt-0.5">PNG, JPG หรือ JPEG (ขนาดไม่เกิน 5MB)</span>
-                      <input type="file" accept="image/*" onChange={handleSlipChange} className="hidden" />
-                    </label>
+                {/* วนลูปสร้างช่องอัปโหลดสลิปแยกตามร้านค้า */}
+                {Object.entries(groupedBySeller).map(([sellerId, group]) => {
+                  const shop = shopsMap[sellerId] || {};
+                  const shopDisplayName = shop.shop_name || group.sellerName;
+                  const shopDueNow = group.items.reduce((sum, item) => {
+                    const itemTotal = Number(item.price) * item.quantity;
+                    return sum + (item.chosen_payment_type === 'deposit' ? itemTotal / 2 : itemTotal);
+                  }, 0);
+                  const preview = slipPreviews[sellerId];
 
-                    {slipPreview && (
-                      <div className="w-28 h-28 rounded-2xl border border-emerald-200 bg-stone-50 overflow-hidden relative shrink-0">
-                        <img src={slipPreview} alt="Slip Preview" className="w-full h-full object-cover" />
+                  return (
+                    <div key={sellerId} className="p-5 rounded-3xl bg-white border border-emerald-100 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-emerald-50">
+                        <div className="flex items-center gap-2">
+                          <Store className="w-4 h-4 text-[#2A9D8F]" />
+                          <h4 className="text-xs font-display font-bold text-stone-900">{shopDisplayName}</h4>
+                        </div>
+                        <span className="text-xs font-bold text-[#E76F51]">ยอดที่ต้องโอน: ฿{shopDueNow.toLocaleString()}</span>
                       </div>
-                    )}
-                  </div>
-                </div>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-4">
+                        <label className="flex-1 w-full flex flex-col items-center justify-center p-5 border-2 border-dashed border-emerald-200 rounded-2xl bg-stone-50/50 hover:bg-emerald-50/50 transition-colors cursor-pointer">
+                          <Upload className="w-5 h-5 text-[#2A9D8F] mb-1.5" />
+                          <span className="text-xs font-bold text-stone-700">คลิกอัปโหลดสลิปของร้าน {shopDisplayName}</span>
+                          <span className="text-[10px] text-stone-400 mt-0.5">PNG, JPG หรือ JPEG (ขนาดไม่เกิน 5MB)</span>
+                          <input type="file" accept="image/*" onChange={(e) => handleSlipChange(sellerId, e)} className="hidden" />
+                        </label>
+
+                        {preview && (
+                          <div className="w-24 h-24 rounded-2xl border border-emerald-200 bg-stone-50 overflow-hidden relative shrink-0">
+                            <img src={preview} alt="Slip Preview" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
 
                 <div className="pt-2 flex justify-end">
                   <button
@@ -596,7 +624,7 @@ export const Checkout = () => {
                     disabled={submitting}
                     className="w-full sm:w-auto px-10 py-4 btn-3d-peach text-sm font-bold rounded-2xl shadow-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>{submitting ? 'กำลังสร้างออเดอร์และส่งสลิป...' : 'ยืนยันและส่งคำสั่งซื้อทันที'}</span>
+                    <span>{submitting ? 'กำลังสร้างออเดอร์และส่งสลิปทุกร้าน...' : 'ยืนยันและส่งคำสั่งซื้อทันที'}</span>
                     <Sparkles className="w-4 h-4" />
                   </button>
                 </div>
