@@ -246,7 +246,7 @@ export const addProduct = async (req, res) => {
     lead_time_days,
     is_made_to_order,
     supports_customization,
-    allow_deposit, // ✅ เพิ่ม allow_deposit ตรงนี้
+    allow_deposit,
     options,
     customizations,
     product_customizations
@@ -302,7 +302,7 @@ export const addProduct = async (req, res) => {
       : 3;
 
     const finalIsMadeToOrder = parseBoolean(is_made_to_order, 0);
-    const finalAllowDeposit = parseBoolean(allow_deposit, 0); // ✅ แปลงค่า allow_deposit เป็น 0 หรือ 1
+    const finalAllowDeposit = parseBoolean(allow_deposit, 0);
 
     let parsedOptions = [];
     if (options) {
@@ -332,7 +332,7 @@ export const addProduct = async (req, res) => {
       `INSERT INTO products (
         seller_id, category_id, title, description, price, stock_quantity,
         image_url, supports_customization, is_made_to_order, allow_deposit, lead_time_days, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`, // ✅ เพิ่ม allow_deposit ลงในคำสั่ง INSERT
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         sellerId,
         validCategoryId,
@@ -343,7 +343,7 @@ export const addProduct = async (req, res) => {
         imageUrl,
         finalSupportsCustomization,
         finalIsMadeToOrder,
-        finalAllowDeposit, // ✅ ใส่ค่า allow_deposit
+        finalAllowDeposit,
         finalLeadTimeDays
       ]
     );
@@ -498,7 +498,7 @@ export const updateProduct = async (req, res) => {
       lead_time_days,
       is_made_to_order,
       supports_customization,
-      allow_deposit, // ✅ เพิ่ม allow_deposit ตรงนี้
+      allow_deposit,
       options,
       customizations,
       product_customizations
@@ -559,7 +559,6 @@ export const updateProduct = async (req, res) => {
       ? parseBoolean(supports_customization, current.supports_customization ? 1 : 0)
       : (current.supports_customization ? 1 : 0);
 
-    // ✅ เพิ่มการจัดการ allow_deposit ตอนอัปเดต
     const newAllowDeposit = allow_deposit !== undefined
       ? parseBoolean(allow_deposit, current.allow_deposit ? 1 : 0)
       : (current.allow_deposit ? 1 : 0);
@@ -575,7 +574,7 @@ export const updateProduct = async (req, res) => {
         lead_time_days = ?,
         is_made_to_order = ?,
         supports_customization = ?,
-        allow_deposit = ? -- ✅ เพิ่ม allow_deposit ในคำสั่ง UPDATE
+        allow_deposit = ?
        WHERE id = ? AND seller_id = ?`,
       [
         newTitle,
@@ -587,7 +586,7 @@ export const updateProduct = async (req, res) => {
         newLeadTimeDays,
         newIsMadeToOrder,
         newSupportsCustomization,
-        newAllowDeposit, // ✅ ใส่ค่า allow_deposit ใหม่
+        newAllowDeposit,
         productId,
         sellerId
       ]
@@ -761,18 +760,22 @@ export const deleteProduct = async (req, res) => {
 export const getSellerOrders = async (req, res) => {
   try {
     const sellerId = req.user.id;
+
+    // ✅ ปรับ SQL Query ให้ดึงข้อมูลออเดอร์โดยเช็คจาก o.seller_id หรือสินค้าในร้านค้านี้โดยตรง
     const [orders] = await pool.query(
-      `SELECT DISTINCT o.id, o.buyer_id, o.status, o.payment_status, o.craft_status, o.total_amount, 
+      `SELECT DISTINCT o.id, o.buyer_id, o.seller_id, o.status, o.payment_status, o.craft_status, o.total_amount, 
               o.shipping_address, o.payment_slip_url, o.final_payment_slip_url, 
               o.payment_type, o.deposit_amount, o.remaining_balance, o.created_at, 
-              u.name as buyer_name, u.email as buyer_email
+              COALESCE(u.name, 'ผู้ซื้อทั่วไป') as buyer_name, u.email as buyer_email
        FROM orders o
-       JOIN order_items oi ON o.id = oi.order_id
-       JOIN products p ON oi.product_id = p.id
-       JOIN users u ON o.buyer_id = u.id
-       WHERE p.seller_id = ?
+       LEFT JOIN users u ON o.buyer_id = u.id
+       WHERE o.seller_id = ? OR o.id IN (
+         SELECT oi.order_id FROM order_items oi 
+         JOIN products p ON oi.product_id = p.id 
+         WHERE p.seller_id = ?
+       )
        ORDER BY o.created_at DESC`,
-      [sellerId]
+      [sellerId, sellerId]
     );
 
     for (const ord of orders) {
@@ -788,6 +791,7 @@ export const getSellerOrders = async (req, res) => {
 
     return res.json({ success: true, data: orders });
   } catch (error) {
+    console.error('getSellerOrders Error:', error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
