@@ -876,6 +876,22 @@ export const updateCraftStatus = async (req, res) => {
       [orderId, craft_status, step_title, note, imageUrl]
     );
 
+    // 🌟 ตรวจสอบและแจกเหรียญรางวัล (Badges) ให้กับผู้ขายอัตโนมัติเมื่อคำสั่งซื้อสำเร็จ
+    if (craft_status === 'completed') {
+      try {
+        let targetSellerId = req.user?.id;
+        if (!targetSellerId) {
+          const [orderRows] = await pool.query('SELECT seller_id FROM orders WHERE id = ?', [orderId]);
+          targetSellerId = orderRows[0]?.seller_id;
+        }
+        if (targetSellerId) {
+          await checkAndAwardBadges(targetSellerId);
+        }
+      } catch (badgeErr) {
+        console.warn('⚠️ checkAndAwardBadges notice:', badgeErr.message);
+      }
+    }
+
     return res.json({
       success: true,
       message: 'อัปเดตสเต็ปงานคราฟต์ ข้อความ และรูปภาพเรียบร้อยแล้ว',
@@ -886,3 +902,212 @@ export const updateCraftStatus = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+/**
+ * 🌟 ตรวจสอบและแจกเหรียญรางวัล (Badges) ให้กับผู้ขาย (Artisan) อัตโนมัติเมื่อคำสั่งซื้อสำเร็จ
+ * @param {number|string} sellerId - รหัสผู้ขาย (Artisan)
+ */
+export const checkAndAwardBadges = async (sellerId) => {
+  if (!sellerId) return { success: false, message: 'sellerId is required' };
+
+  try {
+    // 0. ตรวจสอบและสร้างตาราง badges และ user_badges แบบอัตโนมัติหากยังไม่มีในระบบ
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS badges (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        description TEXT NULL,
+        criteria_type VARCHAR(50) DEFAULT 'orders',
+        criteria_value DECIMAL(10,2) DEFAULT 0,
+        min_orders INT DEFAULT 0,
+        min_revenue DECIMAL(10,2) DEFAULT 0.00,
+        icon VARCHAR(100) NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB;
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_badges (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        badge_id INT NOT NULL,
+        awarded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_user_badge (user_id, badge_id)
+      ) ENGINE=InnoDB;
+    `);
+
+    // 1. ดึงยอดขายรวม (totalRevenue) และจำนวนออเดอร์ที่สำเร็จแล้ว (totalOrders) ของผู้ขาย
+    const [stats] = await pool.query(
+      `SELECT 
+         COUNT(DISTINCT oi.order_id) AS totalOrders,
+         COALESCE(SUM(oi.price * oi.quantity), 0) AS totalRevenue
+       FROM order_items oi
+       JOIN products p ON oi.product_id = p.id
+       JOIN orders o ON oi.order_id = o.id
+       WHERE p.seller_id = ? AND (o.status = 'completed' OR o.craft_status = 'completed')`,
+      [sellerId]
+    );
+
+    const totalOrders = Number(stats[0]?.totalOrders || 0);
+    const totalRevenue = Number(stats[0]?.totalRevenue || 0);
+
+    // 2. ดึงเหรียญรางวัลทั้งหมดที่ผู้ขายยัง "ไม่เคยได้รับ"
+    const [availableBadges] = await pool.query(
+      `SELECT b.* 
+       FROM badges b
+       LEFT JOIN user_badges ub ON b.id = ub.badge_id AND ub.user_id = ?
+       WHERE ub.id IS NULL`,
+      [sellerId]
+    );
+
+    const newlyAwarded = [];
+
+    // 3. วนลูปตรวจสอบเกณฑ์และบันทึกเหรียญใหม่ทันที
+    for (const badge of availableBadges) {
+      let isEligible = false;
+
+      const cType = badge.criteria_type;
+      const cVal = Number(badge.criteria_value || 0);
+      const minOrders = Number(badge.min_orders || 0);
+      const minRevenue = Number(badge.min_revenue || 0);
+
+      if (cType === 'revenue' && totalRevenue >= cVal && cVal > 0) {
+        isEligible = true;
+      } else if (cType === 'orders' && totalOrders >= cVal && cVal > 0) {
+        isEligible = true;
+      } else if (minRevenue > 0 && totalRevenue >= minRevenue) {
+        isEligible = true;
+      } else if (minOrders > 0 && totalOrders >= minOrders) {
+        isEligible = true;
+      }
+
+      // หากผ่านเกณฑ์ ให้ INSERT ลงตาราง user_badges
+      if (isEligible) {
+        await pool.query(
+          `INSERT IGNORE INTO user_badges (user_id, badge_id, awarded_at) 
+           VALUES (?, ?, NOW())`,
+          [sellerId, badge.id]
+        );
+        newlyAwarded.push(badge);
+      }
+    }
+
+    if (newlyAwarded.length > 0) {
+      console.log(`🎉 [Badges] ปลดล็อก ${newlyAwarded.length} เหรียญรางวัลใหม่ให้ผู้ขาย #${sellerId}:`, newlyAwarded.map(b => b.name));
+    }
+
+    return { success: true, newlyAwarded, totalOrders, totalRevenue };
+  } catch (error) {
+    console.error('Error in checkAndAwardBadges:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+/**
+ * ดึงข้อมูลเหรียญรางวัล (Badges) และระดับเลเวล (Tiers & EXP) ของผู้ขาย
+ */
+export const getSellerBadges = async (req, res) => {
+  try {
+    const sellerId = req.user.id;
+
+    // ตรวจสอบและแจกเหรียญรางวัลที่ผ่านเกณฑ์ล่าสุด
+    await checkAndAwardBadges(sellerId);
+
+    // ดึงข้อมูลสถิติยอดขายและออเดอร์
+    const [stats] = await pool.query(
+      `SELECT 
+         COUNT(DISTINCT oi.order_id) AS totalOrders,
+         COALESCE(SUM(oi.price * oi.quantity), 0) AS totalRevenue
+       FROM order_items oi
+       JOIN products p ON oi.product_id = p.id
+       JOIN orders o ON oi.order_id = o.id
+       WHERE p.seller_id = ? AND (o.status = 'completed' OR o.craft_status = 'completed')`,
+      [sellerId]
+    );
+
+    const totalOrders = Number(stats[0]?.totalOrders || 0);
+    const totalRevenue = Number(stats[0]?.totalRevenue || 0);
+
+    // คำนวณค่าประสบการณ์ (EXP) และระดับเลเวล (Tiers)
+    // 1 ออเดอร์สำเร็จ = 100 EXP, ทุกๆ 50 บาท = 1 EXP
+    const expPoints = (totalOrders * 100) + Math.floor(totalRevenue / 50);
+
+    let currentLevel = 1;
+    let levelTitle = 'ช่างฝีมือฝึกหัด (Apprentice)';
+    let minExp = 0;
+    let nextLevelExp = 500;
+
+    if (expPoints >= 4000) {
+      currentLevel = 4;
+      levelTitle = 'ปรมาจารย์แห่งงานคราฟต์ (Grandmaster)';
+      minExp = 4000;
+      nextLevelExp = 10000;
+    } else if (expPoints >= 1500) {
+      currentLevel = 3;
+      levelTitle = 'ช่างศิลป์ชั้นสูง (Master Artisan)';
+      minExp = 1500;
+      nextLevelExp = 4000;
+    } else if (expPoints >= 500) {
+      currentLevel = 2;
+      levelTitle = 'ช่างฝีมือผู้ชำนาญ (Skilled Craftsman)';
+      minExp = 500;
+      nextLevelExp = 1500;
+    }
+
+    const expInLevel = Math.max(0, expPoints - minExp);
+    const expNeeded = Math.max(1, nextLevelExp - minExp);
+    const progressPercent = Math.min(100, Math.round((expInLevel / expNeeded) * 100));
+
+    // หากยังไม่มีเหรียญในตาราง badges เลย ให้ Seed เหรียญเริ่มต้นของระบบ
+    const [existingBadgesCount] = await pool.query('SELECT COUNT(*) as count FROM badges');
+    if (existingBadgesCount[0]?.count === 0) {
+      await pool.query(`
+        INSERT INTO badges (name, description, criteria_type, criteria_value, icon) VALUES
+        ('ก้าวแรกช่างฝีมือ (First Sale)', 'มีคำสั่งซื้อที่เสร็จสมบูรณ์รายการแรก', 'orders', 1, 'Award'),
+        ('ยอดนิยมประจำชุมชน (Rising Artisan)', 'ส่งมอบผลงานสำเร็จครบ 5 คำสั่งซื้อ', 'orders', 5, 'Sparkles'),
+        ('ยอดขายก้าวหน้า (Craft Milestone)', 'สร้างรายได้สะสมทะลุ ฿3,000', 'revenue', 3000, 'TrendingUp'),
+        ('ช่างศิลป์ชั้นครู (Master Artisan)', 'ส่งมอบผลงานสำเร็จครบ 15 คำสั่งซื้อ', 'orders', 15, 'ShieldCheck'),
+        ('ยอดขายหมื่นแรก (Top Studio)', 'สร้างรายได้สะสมทะลุ ฿10,000', 'revenue', 10000, 'Crown')
+      `);
+      await checkAndAwardBadges(sellerId);
+    }
+
+    // ดึงรายการเหรียญทั้งหมด พร้อมสถานะปลดล็อกของผู้ขาย
+    const [allBadges] = await pool.query(
+      `SELECT 
+         b.*, 
+         ub.awarded_at, 
+         (ub.id IS NOT NULL) AS is_unlocked
+       FROM badges b
+       LEFT JOIN user_badges ub ON b.id = ub.badge_id AND ub.user_id = ?
+       ORDER BY b.id ASC`,
+      [sellerId]
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        level: {
+          current_level: currentLevel,
+          title: levelTitle,
+          exp_points: expPoints,
+          min_exp: minExp,
+          next_level_exp: nextLevelExp,
+          progress_percent: progressPercent
+        },
+        stats: {
+          totalOrders,
+          totalRevenue
+        },
+        badges: allBadges.map(b => ({
+          ...b,
+          is_unlocked: Boolean(b.is_unlocked)
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('getSellerBadges Error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+

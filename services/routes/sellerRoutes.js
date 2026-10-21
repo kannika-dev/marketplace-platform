@@ -8,7 +8,8 @@ import {
   updateProduct,
   deleteProduct,
   getSellerReviews,
-  replyToReview
+  replyToReview,
+  getSellerBadges
 } from '../controllers/sellerController.js';
 import { verifyToken, requireRole } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
@@ -19,6 +20,7 @@ router.use(verifyToken);
 router.use(requireRole('seller'));
 
 router.get('/dashboard', getSellerDashboardStats);
+router.get('/badges', getSellerBadges);
 router.get('/products', getSellerProducts);
 router.post('/products', upload.single('image'), addProduct);
 router.put('/products/:id', upload.single('image'), updateProduct);
@@ -31,4 +33,4 @@ router.patch('/orders/:orderId/craft-status', upload.single('image'), updateCraf
 router.get('/reviews', getSellerReviews);
 router.put('/reviews/:reviewId/reply', replyToReview);
 
-export default router;
+export default router;

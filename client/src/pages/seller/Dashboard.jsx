@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import ImageUploadDropzone from '../../components/common/ImageUploadDropzone';
+import SellerBadgesCard from '../../components/seller/SellerBadgesCard';
 import {
   DollarSign, ShoppingBag, Package, Hammer,
   TrendingUp, Plus, CheckCircle, Store, Loader2, AlertCircle,
@@ -388,13 +389,11 @@ function Dashboard() {
   // ==========================================
   const filteredRevenueHistory = useMemo(() => {
     return filteredOrders.filter(ord => {
-      // ตัวกรองค้นหา
       const searchMatch = !revenueSearch ||
         String(ord.id).includes(revenueSearch.trim()) ||
         (ord.buyer_name && ord.buyer_name.toLowerCase().includes(revenueSearch.toLowerCase())) ||
         (ord.buyer_email && ord.buyer_email.toLowerCase().includes(revenueSearch.toLowerCase()));
 
-      // ตัวกรองรูปแบบการชำระ
       const isDeposit = ord.payment_type === 'deposit' || Number(ord.deposit_amount) > 0;
       let paymentMatch = true;
       if (revenuePaymentFilter === 'deposit') paymentMatch = isDeposit;
@@ -626,6 +625,9 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* 🏅 ทำเนียบเหรียญเกียรติยศและระดับเลเวลช่างฝีมือ (Artisan Badges & Tiers System) */}
+      <SellerBadgesCard initialStats={analytics} />
+
       {/* ========================================================= */}
       {/* 🧭 แถบควบคุมศูนย์วิเคราะห์ (Store Analytics Hub Control Bar) */}
       {/* ========================================================= */}
@@ -652,41 +654,37 @@ function Dashboard() {
             </span>
             <button
               onClick={() => setTimeframe('weekly')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                timeframe === 'weekly'
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${timeframe === 'weekly'
                   ? 'bg-emerald-800 text-white shadow-xs'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
-              }`}
+                }`}
             >
               รายสัปดาห์ (Weekly)
             </button>
             <button
               onClick={() => setTimeframe('monthly')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                timeframe === 'monthly'
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${timeframe === 'monthly'
                   ? 'bg-emerald-800 text-white shadow-xs'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
-              }`}
+                }`}
             >
               รายเดือน (Monthly)
             </button>
             <button
               onClick={() => setTimeframe('yearly')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                timeframe === 'yearly'
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${timeframe === 'yearly'
                   ? 'bg-emerald-800 text-white shadow-xs'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
-              }`}
+                }`}
             >
               รายปี (Yearly)
             </button>
             <button
               onClick={() => setTimeframe('all')}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                timeframe === 'all'
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${timeframe === 'all'
                   ? 'bg-stone-800 text-white shadow-xs'
                   : 'text-stone-500 hover:text-stone-800 hover:bg-stone-200/60'
-              }`}
+                }`}
               title="ดูข้อมูลตลอดเวลา"
             >
               ทั้งหมด
@@ -700,11 +698,10 @@ function Dashboard() {
           {/* หมวดที่ 1: 💰 สถิติรายได้ (Revenue) */}
           <button
             onClick={() => setActiveTab('revenue')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${
-              activeTab === 'revenue'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${activeTab === 'revenue'
                 ? 'bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white border-emerald-400 ring-2 ring-emerald-700 shadow-sm'
                 : 'bg-white hover:bg-stone-50/80 border-stone-200'
-            }`}
+              }`}
           >
             <div className="flex justify-between items-center mb-1.5">
               <span className={`text-xs font-bold ${activeTab === 'revenue' ? 'text-emerald-900' : 'text-stone-600'}`}>
@@ -725,11 +722,10 @@ function Dashboard() {
           {/* หมวดที่ 2: 📦 สถิติออเดอร์ (Orders) */}
           <button
             onClick={() => setActiveTab('orders')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${
-              activeTab === 'orders'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${activeTab === 'orders'
                 ? 'bg-gradient-to-br from-blue-50 via-sky-50/50 to-white border-blue-400 ring-2 ring-blue-700 shadow-sm'
                 : 'bg-white hover:bg-stone-50/80 border-stone-200'
-            }`}
+              }`}
           >
             <div className="flex justify-between items-center mb-1.5">
               <span className={`text-xs font-bold ${activeTab === 'orders' ? 'text-blue-900' : 'text-stone-600'}`}>
@@ -750,11 +746,10 @@ function Dashboard() {
           {/* หมวดที่ 3: 🛍️ สถิติสินค้าที่วางขาย (Products) */}
           <button
             onClick={() => setActiveTab('products')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${
-              activeTab === 'products'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${activeTab === 'products'
                 ? 'bg-gradient-to-br from-amber-50 via-orange-50/40 to-white border-amber-400 ring-2 ring-amber-600 shadow-sm'
                 : 'bg-white hover:bg-stone-50/80 border-stone-200'
-            }`}
+              }`}
           >
             <div className="flex justify-between items-center mb-1.5">
               <span className={`text-xs font-bold ${activeTab === 'products' ? 'text-amber-900' : 'text-stone-600'}`}>
@@ -775,11 +770,10 @@ function Dashboard() {
           {/* แท็บเสริมสตูดิโอ: 🔨 งานคราฟต์ที่กำลังทำ */}
           <button
             onClick={() => setActiveTab('craft')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${
-              activeTab === 'craft'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group ${activeTab === 'craft'
                 ? 'bg-gradient-to-br from-purple-50 via-stone-50 to-white border-purple-400 ring-2 ring-purple-600 shadow-sm'
                 : 'bg-white hover:bg-stone-50/80 border-stone-200'
-            }`}
+              }`}
           >
             <div className="flex justify-between items-center mb-1.5">
               <span className={`text-xs font-bold ${activeTab === 'craft' ? 'text-purple-900' : 'text-stone-600'}`}>
@@ -800,11 +794,10 @@ function Dashboard() {
           {/* แท็บเสริมสตูดิโอ: 💬 รีวิวลูกค้า */}
           <button
             onClick={() => setActiveTab('reviews')}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group col-span-2 sm:col-span-1 ${
-              activeTab === 'reviews'
+            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden group col-span-2 sm:col-span-1 ${activeTab === 'reviews'
                 ? 'bg-gradient-to-br from-rose-50 via-stone-50 to-white border-rose-300 ring-2 ring-rose-500 shadow-sm'
                 : 'bg-white hover:bg-stone-50/80 border-stone-200'
-            }`}
+              }`}
           >
             <div className="flex justify-between items-center mb-1.5">
               <span className={`text-xs font-bold ${activeTab === 'reviews' ? 'text-rose-900' : 'text-stone-600'}`}>
@@ -1047,13 +1040,12 @@ function Dashboard() {
                               ฿{Number(ord.total_amount || 0).toLocaleString()}
                             </td>
                             <td className="py-3.5 px-4 text-center">
-                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                ord.status === 'completed'
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${ord.status === 'completed'
                                   ? 'bg-emerald-100 text-emerald-800'
                                   : ord.status === 'paid'
-                                  ? 'bg-teal-100 text-teal-800'
-                                  : 'bg-stone-200 text-stone-700'
-                              }`}>
+                                    ? 'bg-teal-100 text-teal-800'
+                                    : 'bg-stone-200 text-stone-700'
+                                }`}>
                                 {ord.status === 'completed' ? 'สำเร็จเรียบร้อย' : ord.status === 'paid' ? 'ชำระเงินแล้ว' : ord.status}
                               </span>
                             </td>
@@ -1299,13 +1291,12 @@ function Dashboard() {
                               ฿{Number(ord.total_amount || 0).toLocaleString()}
                             </td>
                             <td className="py-3.5 px-4">
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                ord.status === 'completed' || ord.craft_status === 'completed'
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${ord.status === 'completed' || ord.craft_status === 'completed'
                                   ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                   : ord.craft_status
-                                  ? 'bg-purple-100 text-purple-900 border border-purple-200'
-                                  : 'bg-stone-100 text-stone-700'
-                              }`}>
+                                    ? 'bg-purple-100 text-purple-900 border border-purple-200'
+                                    : 'bg-stone-100 text-stone-700'
+                                }`}>
                                 <Hammer className="w-3 h-3 text-purple-700" />
                                 <span>{ord.craft_status || ord.status || 'รอดำเนินการ'}</span>
                               </span>
@@ -1549,13 +1540,12 @@ function Dashboard() {
                             ฿{item.revenueEarned.toLocaleString()}
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${
-                              item.isMadeToOrder
+                            <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] ${item.isMadeToOrder
                                 ? 'bg-purple-50 text-purple-800'
                                 : item.stockNum <= 2
-                                ? 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
-                                : 'bg-stone-100 text-stone-700'
-                            }`}>
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200 animate-pulse'
+                                  : 'bg-stone-100 text-stone-700'
+                              }`}>
                               {item.isMadeToOrder ? 'ผลิตตามสั่ง' : `${item.stockNum} ชิ้น`}
                             </span>
                           </td>

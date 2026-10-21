@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { getSecureCloudinaryUrl } from '../middleware/uploadMiddleware.js';
+import { checkAndAwardBadges } from './sellerController.js';
 
 /**
  * Create new orders with items and initial payment slip (Supports splitting orders automatically by seller and direct slip attachment)
@@ -474,6 +475,14 @@ export const confirmReceivedOrder = async (req, res) => {
     );
 
     await connection.commit();
+
+    // 🌟 ตรวจสอบและแจกเหรียญรางวัล (Badges) ให้กับผู้ขายอัตโนมัติเมื่อผู้ซื้อยืนยันได้รับสินค้า
+    const targetSellerId = orders[0]?.seller_id;
+    if (targetSellerId) {
+      checkAndAwardBadges(targetSellerId).catch(err =>
+        console.warn('⚠️ checkAndAwardBadges notice on confirmReceivedOrder:', err.message)
+      );
+    }
 
     return res.json({
       success: true,
