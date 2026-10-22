@@ -16,7 +16,8 @@ import {
   Clock,
   Layers,
   Tag,
-  Bell
+  Bell,
+  AlertCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -355,7 +356,25 @@ export const ManageOrders = () => {
                 key={ord.id}
                 className="bg-white rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl border border-stone-200/80 hover:border-[#1B4332]/30 transition-all"
               >
-                {/* 🔔 1. แบดจ์แจ้งเตือนด่วน พร้อมแสดงข้อความที่ผู้ซื้อพิมพ์ฝากไว้ */}
+                {/* ⚠️ 1. แบดจ์แจ้งเตือนปัญหา (Dispute Notice) จากตาราง order_disputes */}
+                {ord.dispute_description && (
+                  <div className="p-4 bg-rose-50 rounded-2xl border border-rose-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-rose-900 shadow-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2.5 text-xs font-bold">
+                        <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 animate-bounce" />
+                        <span>⚠️ ผู้ซื้อแจ้งปัญหาเกี่ยวกับสินค้า ({ord.dispute_type || 'Product Issue'})</span>
+                      </div>
+                      <p className="pl-7 text-xs text-rose-800 font-medium italic">
+                        💬 รายละเอียดปัญหา: "{ord.dispute_description}"
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono bg-rose-200 text-rose-900 px-2.5 py-1 rounded-full font-extrabold uppercase shrink-0 self-start sm:self-center">
+                      PENDING DISPUTE
+                    </span>
+                  </div>
+                )}
+
+                {/* 🔔 2. แบดจ์แจ้งเตือนด่วน พร้อมแสดงข้อความที่ผู้ซื้อพิมพ์ฝากไว้ */}
                 {ord.has_pending_update_request === 1 && (
                   <div className="p-4 bg-amber-50 rounded-2xl border border-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 animate-pulse shadow-xs">
                     <div className="space-y-1">

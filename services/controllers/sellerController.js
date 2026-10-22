@@ -755,13 +755,13 @@ export const deleteProduct = async (req, res) => {
 };
 
 /**
- * Get orders that involve this seller's products (รองรับระบบชำระเงิน 2 งวด สลิปรอบสอง สินค้ารายชิ้น 1:1 และ Timeline)
+ * Get orders that involve this seller's products (รองรับระบบชำระเงิน 2 งวด สลิปรอบสอง สินค้ารายชิ้น 1:1 และ Timeline พร้อมดึงข้อมูล dispute จาก order_disputes)
  */
 export const getSellerOrders = async (req, res) => {
   try {
     const sellerId = req.user.id;
 
-    // ✅ เพิ่มการ LEFT JOIN ดึง buyer_note จาก order_update_requests (สถานะ pending)
+    // ✅ เพิ่มการ LEFT JOIN ดึง order_disputes (สถานะ pending) มาแสดงผลให้ผู้ขายเห็น
     const [orders] = await pool.query(
       `SELECT DISTINCT o.id, o.buyer_id, o.seller_id, o.total_amount, o.status, 
               o.payment_slip_url, o.shipping_address, o.created_at, 
@@ -769,10 +769,12 @@ export const getSellerOrders = async (req, res) => {
               o.deposit_amount, o.remaining_balance, o.final_payment_slip_url,
               o.has_pending_update_request,
               our.buyer_note AS update_buyer_note,
+              od.description AS dispute_description, od.issue_type AS dispute_type, od.status AS dispute_status,
               COALESCE(u.name, 'ผู้ซื้อทั่วไป') as buyer_name, u.email as buyer_email
        FROM orders o
        LEFT JOIN users u ON o.buyer_id = u.id
        LEFT JOIN order_update_requests our ON o.id = our.order_id AND our.status = 'pending'
+       LEFT JOIN order_disputes od ON o.id = od.order_id AND od.status = 'pending'
        WHERE o.seller_id = ? OR o.id IN (
          SELECT oi.order_id FROM order_items oi 
          JOIN products p ON oi.product_id = p.id 

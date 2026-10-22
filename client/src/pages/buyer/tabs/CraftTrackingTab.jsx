@@ -159,7 +159,7 @@ export const CraftTrackingTab = () => {
         }
     };
 
-    // ฟังก์ชันผู้ซื้อยิงแจ้งปัญหาเข้าบันทึก Log
+    // ⚠️ ฟังก์ชันผู้ซื้อยิงแจ้งปัญหา บันทึกลงตาราง order_disputes โดยตรง
     const handleReportIssue = async (orderId) => {
         if (!issueText || !issueText.trim()) {
             alert('กรุณาระบุรายละเอียดปัญหาที่พบ');
@@ -168,34 +168,18 @@ export const CraftTrackingTab = () => {
 
         setUpdatingId(orderId);
         try {
-            const formData = new FormData();
-            formData.append('craft_status', 'issue');
-            formData.append('step_title', '⚠️ ผู้ซื้อแจ้งปัญหาเกี่ยวกับสินค้า');
-            formData.append('note', `รายละเอียดปัญหาจากผู้ซื้อ: ${issueText.trim()}`);
-
-            await api.patch(`/orders/${orderId}/craft-status`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
+            await api.post(`/orders/${orderId}/report-issue`, {
+                issue_type: 'Product Issue',
+                description: issueText.trim()
             });
 
-            alert('✨ ส่งรายงานปัญหาถึงช่างฝีมือเรียบร้อยแล้ว');
+            alert('✨ ส่งรายงานปัญหาไปยังระบบเรียบร้อยแล้ว');
             setActiveIssueOrderId(null);
             setIssueText('');
             fetchTrackingData();
         } catch (err) {
             console.error('Report issue error:', err);
-            try {
-                await api.patch(`/seller/orders/${orderId}/craft-status`, {
-                    craft_status: 'issue',
-                    step_title: '⚠️ ผู้ซื้อแจ้งปัญหาเกี่ยวกับสินค้า',
-                    note: `รายละเอียดปัญหาจากผู้ซื้อ: ${issueText.trim()}`
-                });
-                alert('✨ ส่งรายงานปัญหาถึงช่างฝีมือเรียบร้อยแล้ว');
-                setActiveIssueOrderId(null);
-                setIssueText('');
-                fetchTrackingData();
-            } catch (e) {
-                alert('เกิดข้อผิดพลาดในการส่งข้อมูลปัญหา กรุณาลองใหม่อีกครั้ง');
-            }
+            alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการส่งข้อมูลปัญหา กรุณาลองใหม่อีกครั้ง');
         } finally {
             setUpdatingId(null);
         }
@@ -290,8 +274,8 @@ export const CraftTrackingTab = () => {
                                                         setActiveUpdateOrderId(isUpdateFormOpen ? null : order.id);
                                                     }}
                                                     className={`px-3 py-1 border text-[11px] font-bold rounded-full inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${isUpdateFormOpen
-                                                            ? 'bg-amber-500 text-white border-amber-600'
-                                                            : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                                                        ? 'bg-amber-500 text-white border-amber-600'
+                                                        : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
                                                         }`}
                                                 >
                                                     <Bell className="w-3 h-3 text-amber-600 animate-bounce" />

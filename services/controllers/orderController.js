@@ -549,6 +549,52 @@ export const resolveProductUpdate = async (req, res) => {
 };
 
 /**
+ * ⚠️ ผู้ซื้อแจ้งปัญหาเกี่ยวกับคำสั่งซื้อ (บันทึกลงตาราง order_disputes)
+ */
+export const reportOrderIssue = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const buyerId = req.user.id;
+    const { description, issue_type } = req.body;
+
+    if (!description || description.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณาระบุรายละเอียดปัญหาที่พบ'
+      });
+    }
+
+    const [orderCheck] = await pool.query(
+      'SELECT id, seller_id FROM orders WHERE id = ? AND buyer_id = ?',
+      [orderId, buyerId]
+    );
+
+    if (orderCheck.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'ไม่พบคำสั่งซื้อนี้ หรือคุณไม่มีสิทธิ์แจ้งปัญหา'
+      });
+    }
+
+    const sellerId = orderCheck[0].seller_id;
+
+    await pool.query(
+      `INSERT INTO order_disputes (order_id, buyer_id, seller_id, issue_type, description, status, created_at)
+       VALUES (?, ?, ?, ?, ?, 'pending', NOW())`,
+      [orderId, buyerId, sellerId, issue_type || 'Product Issue', description.trim()]
+    );
+
+    return res.json({
+      success: true,
+      message: 'ส่งรายงานปัญหาไปยังระบบเรียบร้อยแล้ว'
+    });
+  } catch (error) {
+    console.error('reportOrderIssue Error:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * Get orders for seller (ดึงรายการออเดอร์, ข้อมูลสลิปทั้งงวดแรกและงวดสอง, สินค้าแยกชิ้นย่อย 1:1, และ Timeline)
  */
 export const getSellerOrders = async (req, res) => {

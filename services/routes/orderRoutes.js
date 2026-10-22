@@ -8,7 +8,8 @@ import {
     uploadFinalPaymentSlip,
     confirmReceivedOrder,
     requestProductUpdate,
-    resolveProductUpdate
+    resolveProductUpdate,
+    reportOrderIssue
 } from '../controllers/orderController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
@@ -52,5 +53,8 @@ router.patch('/:id/confirm-received', confirmReceivedOrder);
 // 🔔 New Routes: ระบบส่งคำร้องขออัปเดตสินค้า และเคลียร์สถานะฝั่งผู้ขาย
 router.post('/:id/request-update', requestProductUpdate);
 router.patch('/:id/resolve-update', resolveProductUpdate);
+
+// ⚠️ New Route: ระบบผู้ซื้อแจ้งปัญหา (บันทึกลงตาราง order_disputes)
+router.post('/:id/report-issue', reportOrderIssue);
 
 export default router;
