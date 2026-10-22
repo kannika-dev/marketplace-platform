@@ -355,14 +355,21 @@ export const ManageOrders = () => {
                 key={ord.id}
                 className="bg-white rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl border border-stone-200/80 hover:border-[#1B4332]/30 transition-all"
               >
-                {/* 🔔 1. แบดจ์แจ้งเตือนด่วน เมื่อผู้ซื้อกดขออัปเดตความคืบหน้า */}
+                {/* 🔔 1. แบดจ์แจ้งเตือนด่วน พร้อมแสดงข้อความที่ผู้ซื้อพิมพ์ฝากไว้ */}
                 {ord.has_pending_update_request === 1 && (
-                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-300 flex items-center justify-between gap-3 text-amber-900 animate-pulse shadow-xs">
-                    <div className="flex items-center gap-2.5 text-xs font-bold">
-                      <Bell className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
-                      <span>🔔 ผู้ซื้อส่งคำร้องขอให้ช่วยอัปเดตความคืบหน้าสินค้าชิ้นนี้ (โปรดอัปเดตสเต็ปงานด้านล่าง)</span>
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 animate-pulse shadow-xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2.5 text-xs font-bold">
+                        <Bell className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
+                        <span>🔔 ผู้ซื้อส่งคำร้องขอให้ช่วยอัปเดตความคืบหน้าสินค้าชิ้นนี้ (โปรดอัปเดตสเต็ปงานด้านล่าง)</span>
+                      </div>
+                      {ord.update_buyer_note && (
+                        <p className="pl-7 text-xs text-amber-800 font-medium italic">
+                          💬 ข้อความจากผู้ซื้อ: "{ord.update_buyer_note}"
+                        </p>
+                      )}
                     </div>
-                    <span className="text-[10px] font-mono bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full font-extrabold uppercase shrink-0">
+                    <span className="text-[10px] font-mono bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full font-extrabold uppercase shrink-0 self-start sm:self-center">
                       URGENT REQUEST
                     </span>
                   </div>
@@ -534,8 +541,8 @@ export const ManageOrders = () => {
                         <div
                           key={idx}
                           className={`p-4 rounded-2xl text-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border transition-all ${isSelectedForUpdate
-                              ? 'bg-emerald-50/70 border-emerald-400 ring-2 ring-emerald-300'
-                              : 'bg-stone-50 border-stone-200/80 hover:border-stone-300'
+                            ? 'bg-emerald-50/70 border-emerald-400 ring-2 ring-emerald-300'
+                            : 'bg-stone-50 border-stone-200/80 hover:border-stone-300'
                             }`}
                         >
                           <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
@@ -594,8 +601,8 @@ export const ManageOrders = () => {
                                 }));
                               }}
                               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${isSelectedForUpdate
-                                  ? 'bg-emerald-800 text-white shadow-xs'
-                                  : 'bg-white hover:bg-stone-100 text-stone-700 border border-stone-300'
+                                ? 'bg-emerald-800 text-white shadow-xs'
+                                : 'bg-white hover:bg-stone-100 text-stone-700 border border-stone-300'
                                 }`}
                             >
                               <Sparkles className="w-3.5 h-3.5 text-[#E76F51]" />

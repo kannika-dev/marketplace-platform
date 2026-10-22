@@ -27,13 +27,12 @@ export const CraftTrackingTab = () => {
     const [previewImage, setPreviewImage] = useState(null);
     const [updatingId, setUpdatingId] = useState(null);
 
-    // State สำหรับ Modal แจ้งปัญหา
-    const [issueModalOrder, setIssueModalOrder] = useState(null);
-    const [issueText, setIssueText] = useState('');
-
-    // State สำหรับ Modal ขออัปเดตความคืบหน้าสินค้า
-    const [updateModalOrder, setUpdateModalOrder] = useState(null);
+    // State สำหรับเปิด-ปิดฟอร์มขออัปเดต / แจ้งปัญหา แบบ Inline ในการ์ด
+    const [activeUpdateOrderId, setActiveUpdateOrderId] = useState(null);
     const [buyerNoteText, setBuyerNoteText] = useState('');
+
+    const [activeIssueOrderId, setActiveIssueOrderId] = useState(null);
+    const [issueText, setIssueText] = useState('');
 
     const renderCustomizationDetails = (details) => {
         if (!details) return null;
@@ -85,7 +84,7 @@ export const CraftTrackingTab = () => {
         fetchTrackingData();
     }, []);
 
-    // ฟังก์ชันอัปโหลดสลิปงวดแรก (กรณีแก้ไขสลิปเดิมที่ไม่ถูกต้อง)
+    // ฟังก์ชันอัปโหลดสลิปงวดแรก
     const handleUploadSlip = async (orderId, event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -102,7 +101,7 @@ export const CraftTrackingTab = () => {
         }
     };
 
-    // ฟังก์ชันอัปโหลดสลิปงวดที่ 2 (ยอดคงเหลือสำหรับสินค้ามัดจำ)
+    // ฟังก์ชันอัปโหลดสลิปงวดที่ 2
     const handleUploadFinalSlip = async (orderId, event) => {
         const file = event.target.files[0];
         if (!file) return;
@@ -140,11 +139,7 @@ export const CraftTrackingTab = () => {
     };
 
     // 🔔 ฟังก์ชันผู้ซื้อส่งคำร้องขออัปเดตความคืบหน้าสินค้า
-    const handleSendUpdateRequest = async () => {
-        if (!updateModalOrder) return;
-        const orderId = updateModalOrder.id;
-        const sellerId = updateModalOrder.seller_id;
-
+    const handleSendUpdateRequest = async (orderId, sellerId) => {
         setUpdatingId(orderId);
         try {
             await api.post(`/orders/${orderId}/request-update`, {
@@ -153,7 +148,7 @@ export const CraftTrackingTab = () => {
             });
 
             alert('✨ ส่งคำร้องขออัปเดตความคืบหน้าไปยังช่างฝีมือเรียบร้อยแล้ว!');
-            setUpdateModalOrder(null);
+            setActiveUpdateOrderId(null);
             setBuyerNoteText('');
             fetchTrackingData();
         } catch (err) {
@@ -165,13 +160,12 @@ export const CraftTrackingTab = () => {
     };
 
     // ฟังก์ชันผู้ซื้อยิงแจ้งปัญหาเข้าบันทึก Log
-    const handleReportIssue = async () => {
+    const handleReportIssue = async (orderId) => {
         if (!issueText || !issueText.trim()) {
             alert('กรุณาระบุรายละเอียดปัญหาที่พบ');
             return;
         }
 
-        const orderId = issueModalOrder.id;
         setUpdatingId(orderId);
         try {
             const formData = new FormData();
@@ -183,8 +177,8 @@ export const CraftTrackingTab = () => {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            alert('✨ ส่งรายงานปัญหาถึงช่างฝีมือเรียบร้อยแล้ว ทางร้านจะรีบตรวจสอบและติดต่อกลับโดยเร็วที่สุด');
-            setIssueModalOrder(null);
+            alert('✨ ส่งรายงานปัญหาถึงช่างฝีมือเรียบร้อยแล้ว');
+            setActiveIssueOrderId(null);
             setIssueText('');
             fetchTrackingData();
         } catch (err) {
@@ -196,7 +190,7 @@ export const CraftTrackingTab = () => {
                     note: `รายละเอียดปัญหาจากผู้ซื้อ: ${issueText.trim()}`
                 });
                 alert('✨ ส่งรายงานปัญหาถึงช่างฝีมือเรียบร้อยแล้ว');
-                setIssueModalOrder(null);
+                setActiveIssueOrderId(null);
                 setIssueText('');
                 fetchTrackingData();
             } catch (e) {
@@ -253,6 +247,9 @@ export const CraftTrackingTab = () => {
 
                         const remainingAmount = order.remaining_balance || (Number(order.total_amount) - Number(order.deposit_amount || Math.round(order.total_amount * 0.5)));
 
+                        const isUpdateFormOpen = activeUpdateOrderId === order.id;
+                        const isIssueFormOpen = activeIssueOrderId === order.id;
+
                         return (
                             <div key={order.id} className="clay-card p-6 rounded-3xl border border-stone-200 bg-white shadow-sm space-y-6">
                                 {/* Header คำสั่งซื้อ */}
@@ -284,15 +281,21 @@ export const CraftTrackingTab = () => {
                                                 </span>
                                             )}
 
-                                            {/* 🔔 ปุ่มขออัปเดตความคืบหน้าสินค้า (สำหรับกระตุ้นผู้ขาย) */}
+                                            {/* 🔔 ปุ่มขออัปเดตความคืบหน้าสินค้า (เปิด-ปิดฟอร์มภายในตัวการ์ด) */}
                                             {!isCompleted && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => setUpdateModalOrder(order)}
-                                                    className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-bold rounded-full inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                                                    onClick={() => {
+                                                        setActiveIssueOrderId(null);
+                                                        setActiveUpdateOrderId(isUpdateFormOpen ? null : order.id);
+                                                    }}
+                                                    className={`px-3 py-1 border text-[11px] font-bold rounded-full inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${isUpdateFormOpen
+                                                            ? 'bg-amber-500 text-white border-amber-600'
+                                                            : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                                                        }`}
                                                 >
                                                     <Bell className="w-3 h-3 text-amber-600 animate-bounce" />
-                                                    <span>🔔 ขออัปเดตสินค้า</span>
+                                                    <span>{isUpdateFormOpen ? '✕ ปิดช่องสะกิด' : '🔔 ขออัปเดตสินค้า'}</span>
                                                 </button>
                                             )}
                                         </div>
@@ -313,7 +316,10 @@ export const CraftTrackingTab = () => {
 
                                                 <button
                                                     type="button"
-                                                    onClick={() => setIssueModalOrder(order)}
+                                                    onClick={() => {
+                                                        setActiveUpdateOrderId(null);
+                                                        setActiveIssueOrderId(isIssueFormOpen ? null : order.id);
+                                                    }}
                                                     className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1"
                                                 >
                                                     <AlertCircle className="w-4 h-4 text-rose-600" />
@@ -327,6 +333,83 @@ export const CraftTrackingTab = () => {
                                         </span>
                                     </div>
                                 </div>
+
+                                {/* 📌 1. ฟอร์มขออัปเดตสินค้า แทรกอยู่ในกรอบการ์ด */}
+                                {isUpdateFormOpen && (
+                                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-300 space-y-3 shadow-inner">
+                                        <div className="flex items-center justify-between border-b border-amber-200 pb-2 text-xs">
+                                            <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                                                <Bell className="w-4 h-4 text-amber-600" /> ส่งข้อความสะกิดช่างฝีมือ (คำสั่งซื้อ #{order.id})
+                                            </span>
+                                            <button onClick={() => setActiveUpdateOrderId(null)} className="text-amber-700 font-bold hover:text-amber-900">✕ ปิด</button>
+                                        </div>
+                                        <p className="text-[11px] text-amber-800">
+                                            พิมพ์ข้อความฝากถึงร้านค้าเพื่อขออัปเดตภาพถ่ายหรือสเต็ปงานคราฟต์ล่าสุดค่ะ
+                                        </p>
+                                        <textarea
+                                            rows={2}
+                                            placeholder="เช่น อยากสอบถามว่างานปั้นชิ้นนี้ดำเนินการถึงไหนแล้วคะ..."
+                                            value={buyerNoteText}
+                                            onChange={(e) => setBuyerNoteText(e.target.value)}
+                                            className="w-full text-xs p-3 bg-white border border-amber-200 rounded-xl focus:outline-none focus:border-amber-500 text-stone-800"
+                                        />
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveUpdateOrderId(null)}
+                                                className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold rounded-xl"
+                                            >
+                                                ยกเลิก
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={updatingId === order.id}
+                                                onClick={() => handleSendUpdateRequest(order.id, order.seller_id)}
+                                                className="px-4 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1 disabled:opacity-50"
+                                            >
+                                                <Send className="w-3.5 h-3.5" />
+                                                <span>{updatingId === order.id ? 'กำลังส่ง...' : 'ยืนยันส่งคำร้อง'}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 📌 2. ฟอร์มแจ้งปัญหา แทรกอยู่ในกรอบการ์ด */}
+                                {isIssueFormOpen && (
+                                    <div className="p-4 bg-rose-50 rounded-2xl border border-rose-300 space-y-3 shadow-inner">
+                                        <div className="flex items-center justify-between border-b border-rose-200 pb-2 text-xs">
+                                            <span className="font-bold text-rose-900 flex items-center gap-1.5">
+                                                <AlertCircle className="w-4 h-4 text-rose-600" /> แจ้งปัญหาเกี่ยวกับคำสั่งซื้อ #{order.id}
+                                            </span>
+                                            <button onClick={() => setActiveIssueOrderId(null)} className="text-rose-700 font-bold hover:text-rose-900">✕ ปิด</button>
+                                        </div>
+                                        <textarea
+                                            rows={3}
+                                            placeholder="ระบุรายละเอียดปัญหาที่พบ เช่น ได้รับสินค้าชำรุด หรือไม่ตรงตามแบบ..."
+                                            value={issueText}
+                                            onChange={(e) => setIssueText(e.target.value)}
+                                            className="w-full text-xs p-3 bg-white border border-rose-200 rounded-xl focus:outline-none focus:border-rose-500 text-stone-800"
+                                        />
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveIssueOrderId(null)}
+                                                className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold rounded-xl"
+                                            >
+                                                ยกเลิก
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={updatingId === order.id}
+                                                onClick={() => handleReportIssue(order.id)}
+                                                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors flex items-center gap-1 disabled:opacity-50"
+                                            >
+                                                <Send className="w-3.5 h-3.5" />
+                                                <span>{updatingId === order.id ? 'กำลังส่ง...' : 'ส่งแจ้งปัญหา'}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* รายการสินค้าในออเดอร์นี้ */}
                                 <div className="space-y-2">
@@ -546,102 +629,6 @@ export const CraftTrackingTab = () => {
                         </div>
                         <div className="rounded-2xl overflow-hidden max-h-[70vh] flex items-center justify-center bg-stone-900">
                             <img src={previewImage} alt="ขยายใหญ่" className="max-h-[68vh] w-auto object-contain" />
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal ขออัปเดตความคืบหน้าสินค้า */}
-            {updateModalOrder && (
-                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setUpdateModalOrder(null)}>
-                    <div className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                            <h4 className="text-sm font-bold text-amber-800 flex items-center gap-1.5">
-                                <Bell className="w-5 h-5 text-amber-600 animate-bounce" /> ขออัปเดตความคืบหน้าคำสั่งซื้อ #{updateModalOrder.id}
-                            </h4>
-                            <button onClick={() => setUpdateModalOrder(null)} className="text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button>
-                        </div>
-
-                        <p className="text-xs text-stone-600">
-                            ส่งคำร้องขอไปยังช่างฝีมือ เพื่อสะกิดเตือนให้ช่วยอัปเดตภาพถ่ายหรือขั้นตอนการผลิตล่าสุดใน Crafting Journey Tracker ค่ะ
-                        </p>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-stone-700 block">
-                                ข้อความฝากถึงร้านค้า (Optional):
-                            </label>
-                            <textarea
-                                rows={3}
-                                placeholder="เช่น อยากสอบถามว่างานปั้นตอนนี้ดำเนินถึงไหนแล้วคะ..."
-                                value={buyerNoteText}
-                                onChange={(e) => setBuyerNoteText(e.target.value)}
-                                className="w-full text-xs p-3 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500 text-stone-800"
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => setUpdateModalOrder(null)}
-                                className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl transition-colors"
-                            >
-                                ยกเลิก
-                            </button>
-                            <button
-                                type="button"
-                                disabled={updatingId === updateModalOrder.id}
-                                onClick={handleSendUpdateRequest}
-                                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
-                            >
-                                <Send className="w-3.5 h-3.5" />
-                                <span>{updatingId === updateModalOrder.id ? 'กำลังส่ง...' : 'ยืนยันส่งคำร้อง'}</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal แจ้งปัญหาเกี่ยวกับสินค้า */}
-            {issueModalOrder && (
-                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIssueModalOrder(null)}>
-                    <div className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-                            <h4 className="text-sm font-bold text-rose-700 flex items-center gap-1.5">
-                                <AlertCircle className="w-5 h-5" /> แจ้งปัญหาคำสั่งซื้อ #{issueModalOrder.id}
-                            </h4>
-                            <button onClick={() => setIssueModalOrder(null)} className="text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-stone-700 block">
-                                ระบุปัญหาที่พบ หรือสิ่งที่ต้องการให้ช่างฝีมือดูแล:
-                            </label>
-                            <textarea
-                                rows={4}
-                                placeholder="เช่น ได้รับสินค้าไม่ตรงตามแบบ, สินค้าชำรุดระหว่างขนส่ง..."
-                                value={issueText}
-                                onChange={(e) => setIssueText(e.target.value)}
-                                className="w-full text-xs p-3 border border-stone-200 rounded-xl focus:outline-none focus:border-rose-500 text-stone-800"
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => setIssueModalOrder(null)}
-                                className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl transition-colors"
-                            >
-                                ยกเลิก
-                            </button>
-                            <button
-                                type="button"
-                                disabled={updatingId === issueModalOrder.id}
-                                onClick={handleReportIssue}
-                                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
-                            >
-                                <Send className="w-3.5 h-3.5" />
-                                <span>{updatingId === issueModalOrder.id ? 'กำลังส่งข้อมูล...' : 'ส่งแจ้งปัญหา'}</span>
-                            </button>
                         </div>
                     </div>
                 </div>

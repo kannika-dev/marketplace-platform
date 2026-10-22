@@ -761,16 +761,18 @@ export const getSellerOrders = async (req, res) => {
   try {
     const sellerId = req.user.id;
 
-    // ✅ เพิ่มการดึงฟิลด์ has_pending_update_request จากตาราง orders ด้วย
+    // ✅ เพิ่มการ LEFT JOIN ดึง buyer_note จาก order_update_requests (สถานะ pending)
     const [orders] = await pool.query(
       `SELECT DISTINCT o.id, o.buyer_id, o.seller_id, o.total_amount, o.status, 
               o.payment_slip_url, o.shipping_address, o.created_at, 
               o.payment_status, o.craft_status, o.payment_method, o.payment_type, 
               o.deposit_amount, o.remaining_balance, o.final_payment_slip_url,
               o.has_pending_update_request,
+              our.buyer_note AS update_buyer_note,
               COALESCE(u.name, 'ผู้ซื้อทั่วไป') as buyer_name, u.email as buyer_email
        FROM orders o
        LEFT JOIN users u ON o.buyer_id = u.id
+       LEFT JOIN order_update_requests our ON o.id = our.order_id AND our.status = 'pending'
        WHERE o.seller_id = ? OR o.id IN (
          SELECT oi.order_id FROM order_items oi 
          JOIN products p ON oi.product_id = p.id 
