@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   Clock,
   Layers,
-  Tag
+  Tag,
+  Bell
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -191,7 +192,7 @@ export const ManageOrders = () => {
     }
   };
 
-  // 6. บันทึกเรื่องราว Artisan Journal (รองรับทั้งการอัปเดตรวม และเลือกสินค้าชิ้นย่อยแบบ 1:1)
+  // 6. บันทึกเรื่องราว Artisan Journal (พร้อมเคลียร์คำร้องขออัปเดตของผู้ซื้ออัตโนมัติ)
   const handleSaveJournalUpdate = async (orderId, titleText, noteText) => {
     if (!titleText || titleText.trim() === '') {
       alert('กรุณาระบุหัวข้อหรือสถานะความคืบหน้า');
@@ -204,7 +205,6 @@ export const ManageOrders = () => {
       const chosenItem = selectedProductItem[orderId];
       let finalTitle = String(titleText).trim();
 
-      // หากเลือกสินค้าชิ้นใดชิ้นหนึ่ง และหัวข้อยังไม่มีชื่อสินค้านำหน้า ให้ใส่ชื่อสินค้าเพื่อความชัดเจน 1:1
       if (chosenItem && chosenItem !== 'all') {
         if (!finalTitle.includes(chosenItem)) {
           finalTitle = `[${chosenItem}] ${finalTitle}`;
@@ -220,11 +220,19 @@ export const ManageOrders = () => {
         formData.append('image', imageFile);
       }
 
+      // 1. บันทึกสเต็ปงานคราฟต์
       await api.patch(`/seller/orders/${orderId}/craft-status`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      alert(`✨ บันทึกเรื่องราว "${finalTitle}" เรียบร้อยแล้ว!`);
+      // 2. 🔔 เคลียร์คำร้องขออัปเดตของผู้ซื้ออัตโนมัติ (ให้ Badge หายไป)
+      try {
+        await api.patch(`/orders/${orderId}/resolve-update`);
+      } catch (resolveErr) {
+        console.warn('Resolve update notice:', resolveErr);
+      }
+
+      alert(`✨ บันทึกเรื่องราว "${finalTitle}" และเคลียร์คำร้องขอของลูกค้าเรียบร้อยแล้ว!`);
 
       setUpdateImageFile({ ...updateImageFile, [orderId]: null });
       setCustomTitle({ ...customTitle, [orderId]: '' });
@@ -347,6 +355,19 @@ export const ManageOrders = () => {
                 key={ord.id}
                 className="bg-white rounded-3xl p-6 sm:p-8 space-y-6 shadow-xl border border-stone-200/80 hover:border-[#1B4332]/30 transition-all"
               >
+                {/* 🔔 1. แบดจ์แจ้งเตือนด่วน เมื่อผู้ซื้อกดขออัปเดตความคืบหน้า */}
+                {ord.has_pending_update_request === 1 && (
+                  <div className="p-4 bg-amber-50 rounded-2xl border border-amber-300 flex items-center justify-between gap-3 text-amber-900 animate-pulse shadow-xs">
+                    <div className="flex items-center gap-2.5 text-xs font-bold">
+                      <Bell className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
+                      <span>🔔 ผู้ซื้อส่งคำร้องขอให้ช่วยอัปเดตความคืบหน้าสินค้าชิ้นนี้ (โปรดอัปเดตสเต็ปงานด้านล่าง)</span>
+                    </div>
+                    <span className="text-[10px] font-mono bg-amber-200 text-amber-900 px-2.5 py-1 rounded-full font-extrabold uppercase shrink-0">
+                      URGENT REQUEST
+                    </span>
+                  </div>
+                )}
+
                 {/* Header คำสั่งซื้อ */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-stone-200 gap-4">
                   <div className="space-y-1">
@@ -379,10 +400,8 @@ export const ManageOrders = () => {
                   </div>
                 </div>
 
-                {/* 📌 แผงตรวจสอบสลิปโอนเงิน (รองรับการแนบสลิปทันทีจากหน้า Checkout และงวดที่ 2) */}
+                {/* 📌 แผงตรวจสอบสลิปโอนเงิน */}
                 <div className="space-y-4">
-
-                  {/* กล่องที่ 1: สลิปงวดแรก / จ่ายเต็ม */}
                   <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       {ord.payment_slip_url ? (
@@ -403,9 +422,7 @@ export const ManageOrders = () => {
                       <div>
                         <span className="font-bold text-xs text-stone-900 block">หลักฐานสลิปการชำระเงิน (งวดแรก / เต็มจำนวน)</span>
                         <span className="text-[11px] text-stone-500">
-                          {hasUploadedSlip
-                            ? '✨ ลูกค้าแนบสลิปมาแล้ว กรุณาตรวจสอบความถูกต้อง'
-                            : 'ยังไม่มีการแนบสลิปจากผู้ซื้อ'}
+                          {hasUploadedSlip ? '✨ ลูกค้าแนบสลิปมาแล้ว กรุณาตรวจสอบความถูกต้อง' : 'ยังไม่มีการแนบสลิปจากผู้ซื้อ'}
                         </span>
                       </div>
                     </div>
@@ -432,7 +449,6 @@ export const ManageOrders = () => {
                         </>
                       )}
 
-                      {/* ปุ่มแจ้งชำระเงินงวดที่ 2 สำหรับสินค้าแบบมัดจำ */}
                       {isDeposit && (currentCraftStatus === 'in_progress' || currentCraftStatus === 'production_finished') && (
                         <button
                           type="button"
@@ -447,7 +463,6 @@ export const ManageOrders = () => {
                     </div>
                   </div>
 
-                  {/* กล่องที่ 2: สลิปยอดคงเหลือ / งวดที่ 2 (แสดงเมื่อเป็นออเดอร์มัดจำ) */}
                   {isDeposit && (isAwaitingFinalPayment || hasUploadedFinalSlip || currentCraftStatus === 'ready_to_ship' || isCompleted) && (
                     <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
@@ -469,9 +484,7 @@ export const ManageOrders = () => {
                         <div>
                           <span className="font-bold text-xs text-amber-900 block">หลักฐานสลิปยอดคงเหลือ (งวดที่ 2) - ฿{remainingAmt.toLocaleString()}</span>
                           <span className="text-[11px] text-amber-700">
-                            {hasUploadedFinalSlip
-                              ? '🎉 ลูกค้าแนบสลิปงวดที่ 2 แล้ว กรุณาตรวจสอบ'
-                              : 'ส่งแจ้งเตือนให้ลูกค้าชำระเงินงวดที่ 2 แล้ว รอหลักฐานโอนเงิน'}
+                            {hasUploadedFinalSlip ? '🎉 ลูกค้าแนบสลิปงวดที่ 2 แล้ว กรุณาตรวจสอบ' : 'ส่งแจ้งเตือนให้ลูกค้าชำระเงินงวดที่ 2 แล้ว รอหลักฐานโอนเงิน'}
                           </span>
                         </div>
                       </div>
@@ -500,18 +513,15 @@ export const ManageOrders = () => {
                       </div>
                     </div>
                   )}
-
                 </div>
 
-                {/* รายการสินค้าแยกชิ้นย่อย 1:1 ตรงกันกับฝั่งผู้ซื้อ */}
+                {/* รายการสินค้าแยกชิ้นย่อย 1:1 */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono tracking-widest uppercase text-stone-400 font-bold block">
                       ORDERED PIECES // {ord.items?.length || 0} ITEM(S)
                     </span>
-                    <span className="text-[11px] text-stone-500 font-medium">
-                      รายการสินค้าที่ลูกค้าสั่งทำในออเดอร์นี้
-                    </span>
+                    <span className="text-[11px] text-stone-500 font-medium">รายการสินค้าที่ลูกค้าสั่งทำในออเดอร์นี้</span>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
@@ -523,24 +533,18 @@ export const ManageOrders = () => {
                       return (
                         <div
                           key={idx}
-                          className={`p-4 rounded-2xl text-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border transition-all ${
-                            isSelectedForUpdate
+                          className={`p-4 rounded-2xl text-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border transition-all ${isSelectedForUpdate
                               ? 'bg-emerald-50/70 border-emerald-400 ring-2 ring-emerald-300'
                               : 'bg-stone-50 border-stone-200/80 hover:border-stone-300'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
-                            {/* รูปภาพสินค้า */}
                             {itemImg ? (
                               <div
                                 onClick={() => setPreviewImage(itemImg)}
                                 className="relative w-16 h-16 rounded-xl overflow-hidden border border-stone-200 shrink-0 bg-white cursor-pointer group shadow-xs"
                               >
-                                <img
-                                  src={itemImg}
-                                  alt={itemTitle}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                />
+                                <img src={itemImg} alt={itemTitle} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
                                   <Eye className="w-4 h-4" />
                                 </div>
@@ -553,9 +557,7 @@ export const ManageOrders = () => {
 
                             <div className="space-y-1 min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-display font-bold text-stone-900 text-sm sm:text-base">
-                                  {itemTitle}
-                                </span>
+                                <span className="font-display font-bold text-stone-900 text-sm sm:text-base">{itemTitle}</span>
                                 {it.is_made_to_order ? (
                                   <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] px-2 py-0.5 rounded-full font-bold">
                                     งานสั่งทำ (Made-to-Order)
@@ -565,18 +567,12 @@ export const ManageOrders = () => {
                                     สินค้าสำเร็จรูป
                                   </span>
                                 )}
-                                {it.lead_time_days > 0 && (
-                                  <span className="text-[10px] text-stone-500 font-mono">
-                                    ผลิต ~{it.lead_time_days} วัน
-                                  </span>
-                                )}
                               </div>
 
                               <p className="text-stone-500 text-[11px]">
                                 จำนวน: <strong className="font-bold text-stone-800">{it.quantity} ชิ้น</strong> • ราคาชิ้นละ ฿{Number(it.price).toLocaleString()}
                               </p>
 
-                              {/* แสดงตัวเลือก Customization ที่ลูกค้าเลือก */}
                               {renderCustomizationDetails(it.customization_details || it.customization_notes)}
                             </div>
                           </div>
@@ -589,7 +585,6 @@ export const ManageOrders = () => {
                               </span>
                             </div>
 
-                            {/* ปุ่มเลือกสินค้านี้เพื่อไปอัปเดตสเต็ปงานคราฟต์ */}
                             <button
                               type="button"
                               onClick={() => {
@@ -598,11 +593,10 @@ export const ManageOrders = () => {
                                   [ord.id]: prev[ord.id] === itemTitle ? 'all' : itemTitle
                                 }));
                               }}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                                isSelectedForUpdate
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${isSelectedForUpdate
                                   ? 'bg-emerald-800 text-white shadow-xs'
                                   : 'bg-white hover:bg-stone-100 text-stone-700 border border-stone-300'
-                              }`}
+                                }`}
                             >
                               <Sparkles className="w-3.5 h-3.5 text-[#E76F51]" />
                               <span>{isSelectedForUpdate ? '✓ เลือกชิ้นนี้อยู่' : 'เลือกอัปเดตชิ้นนี้'}</span>
@@ -634,7 +628,6 @@ export const ManageOrders = () => {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {/* 0. ตัวเลือกสินค้าที่ต้องการอัปเดตสเต็ป (แบบแยกชิ้นย่อย 1:1) */}
                       {ord.items && ord.items.length > 1 && (
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold flex items-center gap-1.5">
@@ -659,7 +652,6 @@ export const ManageOrders = () => {
                         </div>
                       )}
 
-                      {/* 1. หัวข้อสถานะ/กำลังทำอะไรอยู่ */}
                       <div className="space-y-2">
                         <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
                           1. หัวข้อสถานะ / กำลังทำอะไรอยู่ (พิมพ์เองได้อิสระ)
@@ -676,7 +668,6 @@ export const ManageOrders = () => {
                           className="w-full text-xs p-3 bg-white text-stone-900 rounded-xl focus:outline-none font-bold"
                         />
 
-                        {/* Quick Tags กดเลือกคำไวๆ */}
                         <div className="flex flex-wrap gap-1.5 pt-1">
                           <span className="text-[10px] text-emerald-200/80 font-mono py-0.5">คีย์เวิร์ดด่วน:</span>
                           {QUICK_STATUS_TAGS.map((tag, tagIdx) => (
@@ -692,7 +683,6 @@ export const ManageOrders = () => {
                         </div>
                       </div>
 
-                      {/* 2. ข้อความถึงลูกค้าเพิ่มเติม */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
                           2. ข้อความถึงลูกค้าเพิ่มเติม (ไม่บังคับ)
@@ -706,7 +696,6 @@ export const ManageOrders = () => {
                         />
                       </div>
 
-                      {/* 3. แนบรูปถ่ายจากโต๊ะทำงานจริง */}
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-mono uppercase tracking-wider text-emerald-200 block font-bold">
                           3. แนบรูปถ่ายความคืบหน้า (ไม่บังคับ)
@@ -738,9 +727,7 @@ export const ManageOrders = () => {
                         >
                           <Send className="w-4 h-4 shrink-0" />
                           <span>
-                            {updatingId === ord.id
-                              ? 'กำลังบันทึกเรื่องราว...'
-                              : '✨ บันทึกและส่งเรื่องราวความคืบหน้าถึงลูกค้า'}
+                            {updatingId === ord.id ? 'กำลังบันทึกเรื่องราว...' : '✨ บันทึก ส่งเรื่องราว & เคลียร์คำร้องขอ'}
                           </span>
                         </button>
                       </div>
@@ -748,7 +735,7 @@ export const ManageOrders = () => {
                   )}
                 </div>
 
-                {/* 📌 Timeline ประวัติความคืบหน้างานคราฟต์ที่เคยบันทึกไว้ (ตรงกันกับฝั่งผู้ซื้อ 1:1) */}
+                {/* 📌 Timeline ประวัติความคืบหน้างานคราฟต์ */}
                 {ord.timeline && ord.timeline.length > 0 && (
                   <div className="space-y-3 pt-2">
                     <span className="text-[10px] font-mono tracking-widest uppercase text-stone-400 font-bold block flex items-center gap-1.5">

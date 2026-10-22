@@ -761,12 +761,13 @@ export const getSellerOrders = async (req, res) => {
   try {
     const sellerId = req.user.id;
 
-    // ✅ ดึงข้อมูลออเดอร์โดยอิงจากโครงสร้างตาราง orders จริง 100%
+    // ✅ เพิ่มการดึงฟิลด์ has_pending_update_request จากตาราง orders ด้วย
     const [orders] = await pool.query(
       `SELECT DISTINCT o.id, o.buyer_id, o.seller_id, o.total_amount, o.status, 
               o.payment_slip_url, o.shipping_address, o.created_at, 
               o.payment_status, o.craft_status, o.payment_method, o.payment_type, 
               o.deposit_amount, o.remaining_balance, o.final_payment_slip_url,
+              o.has_pending_update_request,
               COALESCE(u.name, 'ผู้ซื้อทั่วไป') as buyer_name, u.email as buyer_email
        FROM orders o
        LEFT JOIN users u ON o.buyer_id = u.id
@@ -780,7 +781,6 @@ export const getSellerOrders = async (req, res) => {
     );
 
     for (const ord of orders) {
-      // ✅ ดึงข้อมูล order_items โดย JOIN products และไม่อ้างอิง oi.seller_id
       const [items] = await pool.query(
         `SELECT oi.id, oi.order_id, oi.product_id, oi.quantity, oi.price, oi.customization_notes,
                 p.title, p.image_url, p.is_made_to_order, p.lead_time_days,
@@ -806,7 +806,6 @@ export const getSellerOrders = async (req, res) => {
       }
       ord.items = items;
 
-      // ✅ ดึงประวัติจาก craft_tracking_logs ตามโครงสร้างจริง
       const [timeline] = await pool.query(
         `SELECT id, order_id, step, status_title, notes, image_url, created_at 
          FROM craft_tracking_logs 
@@ -846,7 +845,6 @@ export const updateCraftStatus = async (req, res) => {
       imageUrl = req.body.image_url;
     }
 
-    // ซิงก์คอลัมน์ status และ payment_status ของตาราง orders เมื่อสเต็ปเปลี่ยน
     let updateSql = 'UPDATE orders SET craft_status = ?';
     let updateParams = [craft_status];
 
@@ -869,14 +867,22 @@ export const updateCraftStatus = async (req, res) => {
 
     await pool.query(updateSql, updateParams);
 
-    // บันทึกลงตาราง craft_tracking_logs ตามโครงสร้างจริง
+    // บันทึกลงตาราง craft_tracking_logs
     await pool.query(
       `INSERT INTO craft_tracking_logs (order_id, step, status_title, notes, image_url, created_at)
        VALUES (?, ?, ?, ?, ?, NOW())`,
       [orderId, craft_status, step_title, note, imageUrl]
     );
 
-    // 🌟 ตรวจสอบและแจกเหรียญรางวัล (Badges) ให้กับผู้ขายอัตโนมัติเมื่อคำสั่งซื้อสำเร็จ
+    // 🔔 🌟 เมื่อผู้ขายอัปเดตสเต็ปงาน ให้เคลียร์คำร้องขออัปเดต (has_pending_update_request = FALSE) ทันที
+    try {
+      await pool.query(`UPDATE orders SET has_pending_update_request = FALSE WHERE id = ?`, [orderId]);
+      await pool.query(`UPDATE order_update_requests SET status = 'resolved' WHERE order_id = ?`, [orderId]);
+    } catch (resolveErr) {
+      console.warn('Resolve update request notice:', resolveErr.message);
+    }
+
+    // ตรวจสอบและแจกเหรียญรางวัล (Badges) อัตโนมัติเมื่อคำสั่งซื้อสำเร็จ
     if (craft_status === 'completed') {
       try {
         let targetSellerId = req.user?.id;
@@ -911,7 +917,6 @@ export const checkAndAwardBadges = async (sellerId) => {
   if (!sellerId) return { success: false, message: 'sellerId is required' };
 
   try {
-    // 0. ตรวจสอบและสร้างตาราง badges และ user_badges แบบอัตโนมัติหากยังไม่มีในระบบ
     await pool.query(`
       CREATE TABLE IF NOT EXISTS badges (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -936,7 +941,6 @@ export const checkAndAwardBadges = async (sellerId) => {
       ) ENGINE=InnoDB;
     `);
 
-    // 1. ดึงยอดขายรวม (totalRevenue) และจำนวนออเดอร์ที่สำเร็จแล้ว (totalOrders) ของผู้ขาย
     const [stats] = await pool.query(
       `SELECT 
          COUNT(DISTINCT oi.order_id) AS totalOrders,
@@ -951,7 +955,6 @@ export const checkAndAwardBadges = async (sellerId) => {
     const totalOrders = Number(stats[0]?.totalOrders || 0);
     const totalRevenue = Number(stats[0]?.totalRevenue || 0);
 
-    // 2. ดึงเหรียญรางวัลทั้งหมดที่ผู้ขายยัง "ไม่เคยได้รับ"
     const [availableBadges] = await pool.query(
       `SELECT b.* 
        FROM badges b
@@ -962,7 +965,6 @@ export const checkAndAwardBadges = async (sellerId) => {
 
     const newlyAwarded = [];
 
-    // 3. วนลูปตรวจสอบเกณฑ์และบันทึกเหรียญใหม่ทันที
     for (const badge of availableBadges) {
       let isEligible = false;
 
@@ -981,7 +983,6 @@ export const checkAndAwardBadges = async (sellerId) => {
         isEligible = true;
       }
 
-      // หากผ่านเกณฑ์ ให้ INSERT ลงตาราง user_badges
       if (isEligible) {
         await pool.query(
           `INSERT IGNORE INTO user_badges (user_id, badge_id, awarded_at) 
@@ -990,10 +991,6 @@ export const checkAndAwardBadges = async (sellerId) => {
         );
         newlyAwarded.push(badge);
       }
-    }
-
-    if (newlyAwarded.length > 0) {
-      console.log(`🎉 [Badges] ปลดล็อก ${newlyAwarded.length} เหรียญรางวัลใหม่ให้ผู้ขาย #${sellerId}:`, newlyAwarded.map(b => b.name));
     }
 
     return { success: true, newlyAwarded, totalOrders, totalRevenue };
@@ -1010,10 +1007,8 @@ export const getSellerBadges = async (req, res) => {
   try {
     const sellerId = req.user.id;
 
-    // ตรวจสอบและแจกเหรียญรางวัลที่ผ่านเกณฑ์ล่าสุด
     await checkAndAwardBadges(sellerId);
 
-    // ดึงข้อมูลสถิติยอดขายและออเดอร์
     const [stats] = await pool.query(
       `SELECT 
          COUNT(DISTINCT oi.order_id) AS totalOrders,
@@ -1028,8 +1023,6 @@ export const getSellerBadges = async (req, res) => {
     const totalOrders = Number(stats[0]?.totalOrders || 0);
     const totalRevenue = Number(stats[0]?.totalRevenue || 0);
 
-    // คำนวณค่าประสบการณ์ (EXP) และระดับเลเวล (Tiers)
-    // 1 ออเดอร์สำเร็จ = 100 EXP, ทุกๆ 50 บาท = 1 EXP
     const expPoints = (totalOrders * 100) + Math.floor(totalRevenue / 50);
 
     let currentLevel = 1;
@@ -1058,7 +1051,6 @@ export const getSellerBadges = async (req, res) => {
     const expNeeded = Math.max(1, nextLevelExp - minExp);
     const progressPercent = Math.min(100, Math.round((expInLevel / expNeeded) * 100));
 
-    // หากยังไม่มีเหรียญในตาราง badges เลย ให้ Seed เหรียญเริ่มต้นของระบบ
     const [existingBadgesCount] = await pool.query('SELECT COUNT(*) as count FROM badges');
     if (existingBadgesCount[0]?.count === 0) {
       await pool.query(`
@@ -1072,7 +1064,6 @@ export const getSellerBadges = async (req, res) => {
       await checkAndAwardBadges(sellerId);
     }
 
-    // ดึงรายการเหรียญทั้งหมด พร้อมสถานะปลดล็อกของผู้ขาย
     const [allBadges] = await pool.query(
       `SELECT 
          b.*, 
@@ -1110,4 +1101,3 @@ export const getSellerBadges = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
-

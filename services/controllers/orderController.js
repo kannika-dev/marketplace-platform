@@ -498,18 +498,70 @@ export const confirmReceivedOrder = async (req, res) => {
 };
 
 /**
+ * 🔔 1. ผู้ซื้อส่งคำร้องขออัปเดตความคืบหน้าสินค้า (Request Progress Update)
+ */
+export const requestProductUpdate = async (req, res) => {
+  const orderId = req.params.id;
+  const buyerId = req.user.id;
+  const { seller_id, buyer_note } = req.body;
+
+  try {
+    // บันทึกลงตาราง order_update_requests
+    await pool.query(
+      `INSERT INTO order_update_requests (order_id, buyer_id, seller_id, buyer_note, status) VALUES (?, ?, ?, ?, 'pending')`,
+      [orderId, buyerId, seller_id || null, buyer_note || 'ผู้ซื้อขอติดตามอัปเดตความคืบหน้าของสินค้าชิ้นนี้ค่ะ']
+    );
+
+    // อัปเดต flag ในตาราง orders ให้แจ้งเตือนฝั่งผู้ขาย
+    await pool.query(
+      `UPDATE orders SET has_pending_update_request = TRUE WHERE id = ?`,
+      [orderId]
+    );
+
+    return res.status(200).json({ success: true, message: 'ส่งคำร้องขออัปเดตความคืบหน้าเรียบร้อยแล้ว' });
+  } catch (error) {
+    console.error('Error requesting update:', error);
+    return res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการส่งคำร้องขอ' });
+  }
+};
+
+/**
+ * 🔔 2. ผู้ขายเคลียร์คำร้องขอเมื่ออัปเดตงานเสร็จแล้ว (Resolve Update Request)
+ */
+export const resolveProductUpdate = async (req, res) => {
+  const orderId = req.params.id;
+
+  try {
+    await pool.query(
+      `UPDATE orders SET has_pending_update_request = FALSE WHERE id = ?`,
+      [orderId]
+    );
+    await pool.query(
+      `UPDATE order_update_requests SET status = 'resolved' WHERE order_id = ?`,
+      [orderId]
+    );
+
+    return res.status(200).json({ success: true, message: 'เคลียร์คำร้องขออัปเดตเรียบร้อยแล้ว' });
+  } catch (error) {
+    console.error('Error resolving update:', error);
+    return res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการอัปเดตสถานะ' });
+  }
+};
+
+/**
  * Get orders for seller (ดึงรายการออเดอร์, ข้อมูลสลิปทั้งงวดแรกและงวดสอง, สินค้าแยกชิ้นย่อย 1:1, และ Timeline)
  */
 export const getSellerOrders = async (req, res) => {
   try {
     const sellerId = req.params.sellerId || req.user.id;
 
-    // ✅ ดึงข้อมูลออเดอร์ตามโครงสร้างตาราง orders จริง 100%
+    // ✅ ดึงข้อมูลออเดอร์ตามโครงสร้างตาราง orders จริง 100% (รวมฟิลด์ has_pending_update_request)
     const [orders] = await pool.query(
       `SELECT DISTINCT o.id, o.buyer_id, o.seller_id, o.total_amount, o.status, 
               o.payment_slip_url, o.shipping_address, o.created_at, 
               o.payment_status, o.craft_status, o.payment_method, o.payment_type, 
               o.deposit_amount, o.remaining_balance, o.final_payment_slip_url,
+              o.has_pending_update_request,
               COALESCE(u.name, 'ผู้ซื้อทั่วไป') as buyer_name, u.email as buyer_email
        FROM orders o
        LEFT JOIN users u ON o.buyer_id = u.id

@@ -6,7 +6,9 @@ import {
     getSellerOrders,
     uploadPaymentSlip,
     uploadFinalPaymentSlip,
-    confirmReceivedOrder
+    confirmReceivedOrder,
+    requestProductUpdate,
+    resolveProductUpdate
 } from '../controllers/orderController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
@@ -46,5 +48,9 @@ router.post('/:id/upload-final-slip', uploadSlipMiddleware, uploadFinalPaymentSl
 
 // Route สำหรับผู้ซื้อยืนยันรับสินค้าและเสร็จสิ้นออเดอร์
 router.patch('/:id/confirm-received', confirmReceivedOrder);
+
+// 🔔 New Routes: ระบบส่งคำร้องขออัปเดตสินค้า และเคลียร์สถานะฝั่งผู้ขาย
+router.post('/:id/request-update', requestProductUpdate);
+router.patch('/:id/resolve-update', resolveProductUpdate);
 
 export default router;

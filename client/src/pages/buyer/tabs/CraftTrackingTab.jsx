@@ -15,7 +15,8 @@ import {
     RefreshCw,
     AlertCircle,
     Send,
-    Store
+    Store,
+    Bell
 } from 'lucide-react';
 import { getMyOrders, uploadPaymentSlip, uploadFinalPaymentSlip } from '../../../services/orderService';
 import api from '../../../services/api';
@@ -29,6 +30,10 @@ export const CraftTrackingTab = () => {
     // State สำหรับ Modal แจ้งปัญหา
     const [issueModalOrder, setIssueModalOrder] = useState(null);
     const [issueText, setIssueText] = useState('');
+
+    // State สำหรับ Modal ขออัปเดตความคืบหน้าสินค้า
+    const [updateModalOrder, setUpdateModalOrder] = useState(null);
+    const [buyerNoteText, setBuyerNoteText] = useState('');
 
     const renderCustomizationDetails = (details) => {
         if (!details) return null;
@@ -129,6 +134,31 @@ export const CraftTrackingTab = () => {
         } catch (err) {
             console.error('Confirm received error:', err);
             alert(err.response?.data?.message || 'เกิดข้อผิดพลาดในการยืนยันรับสินค้า กรุณาลองใหม่อีกครั้ง');
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    // 🔔 ฟังก์ชันผู้ซื้อส่งคำร้องขออัปเดตความคืบหน้าสินค้า
+    const handleSendUpdateRequest = async () => {
+        if (!updateModalOrder) return;
+        const orderId = updateModalOrder.id;
+        const sellerId = updateModalOrder.seller_id;
+
+        setUpdatingId(orderId);
+        try {
+            await api.post(`/orders/${orderId}/request-update`, {
+                seller_id: sellerId,
+                buyer_note: buyerNoteText.trim() || 'ผู้ซื้อขอติดตามอัปเดตความคืบหน้าของสินค้าชิ้นนี้ค่ะ'
+            });
+
+            alert('✨ ส่งคำร้องขออัปเดตความคืบหน้าไปยังช่างฝีมือเรียบร้อยแล้ว!');
+            setUpdateModalOrder(null);
+            setBuyerNoteText('');
+            fetchTrackingData();
+        } catch (err) {
+            console.error('Request update error:', err);
+            alert('เกิดข้อผิดพลาดในการส่งคำร้องขอ กรุณาลองใหม่อีกครั้ง');
         } finally {
             setUpdatingId(null);
         }
@@ -238,7 +268,7 @@ export const CraftTrackingTab = () => {
                                             <span>ร้านค้า: {order.shop_name || 'ร้านค้าแฮนด์เมด'}</span>
                                         </div>
 
-                                        <div className="pt-1">
+                                        <div className="pt-1 flex items-center gap-2 flex-wrap">
                                             {isCompleted ? (
                                                 <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-bold rounded-full inline-flex items-center gap-1.5">
                                                     🎉 เสร็จสมบูรณ์: ผู้ซื้อได้รับสินค้าแล้ว
@@ -252,6 +282,18 @@ export const CraftTrackingTab = () => {
                                                     <Sparkles className="w-3 h-3 text-[#E76F51]" />
                                                     <span>ความคืบหน้าล่าสุด: <strong>{latestTitle}</strong></span>
                                                 </span>
+                                            )}
+
+                                            {/* 🔔 ปุ่มขออัปเดตความคืบหน้าสินค้า (สำหรับกระตุ้นผู้ขาย) */}
+                                            {!isCompleted && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setUpdateModalOrder(order)}
+                                                    className="px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[11px] font-bold rounded-full inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                                                >
+                                                    <Bell className="w-3 h-3 text-amber-600 animate-bounce" />
+                                                    <span>🔔 ขออัปเดตสินค้า</span>
+                                                </button>
                                             )}
                                         </div>
                                     </div>
@@ -286,7 +328,7 @@ export const CraftTrackingTab = () => {
                                     </div>
                                 </div>
 
-                                {/* รายการสินค้าในออเดอร์นี้ (แสดงผล 1:1 กับฝั่งช่างฝีมือ) */}
+                                {/* รายการสินค้าในออเดอร์นี้ */}
                                 <div className="space-y-2">
                                     <span className="text-xs font-bold text-stone-700 block">
                                         รายการสินค้าในคำสั่งซื้อนี้ ({order.items?.length || 0} ชิ้น):
@@ -353,7 +395,7 @@ export const CraftTrackingTab = () => {
                                         <p className="text-stone-500 whitespace-pre-line">{order.shipping_address}</p>
                                     </div>
 
-                                    {/* สถานะชำระเงิน & หลักฐาน (เน้นแสดงสลิป และเปิดช่องอัปโหลดเฉพาะกรณีสลิปมีปัญหา หรือร้านเรียกเก็บงวดที่ 2) */}
+                                    {/* สถานะชำระเงิน & หลักฐาน */}
                                     <div className="p-4 bg-stone-50 rounded-2xl border border-stone-100 text-xs space-y-3 flex flex-col justify-between">
                                         <div className="space-y-1.5">
                                             <span className="font-bold text-stone-800 block">สถานะการชำระเงิน &amp; หลักฐาน:</span>
@@ -421,7 +463,6 @@ export const CraftTrackingTab = () => {
                                                 )}
                                             </div>
                                         ) : hasUploadedSlip ? (
-                                            // 📌 กรณีแนบสลิปมาแล้ว แสดงตัวอย่างสลิปและปุ่มดูรูป (ไม่ต้องมีช่องอัปโหลดเกะกะ)
                                             <div className="p-2.5 bg-white rounded-xl border border-stone-200 flex items-center justify-between gap-3">
                                                 <div className="flex items-center gap-2.5 overflow-hidden">
                                                     <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-stone-200 shrink-0 bg-stone-100">
@@ -505,6 +546,56 @@ export const CraftTrackingTab = () => {
                         </div>
                         <div className="rounded-2xl overflow-hidden max-h-[70vh] flex items-center justify-center bg-stone-900">
                             <img src={previewImage} alt="ขยายใหญ่" className="max-h-[68vh] w-auto object-contain" />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal ขออัปเดตความคืบหน้าสินค้า */}
+            {updateModalOrder && (
+                <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setUpdateModalOrder(null)}>
+                    <div className="relative max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+                            <h4 className="text-sm font-bold text-amber-800 flex items-center gap-1.5">
+                                <Bell className="w-5 h-5 text-amber-600 animate-bounce" /> ขออัปเดตความคืบหน้าคำสั่งซื้อ #{updateModalOrder.id}
+                            </h4>
+                            <button onClick={() => setUpdateModalOrder(null)} className="text-stone-400 hover:text-stone-600"><X className="w-5 h-5" /></button>
+                        </div>
+
+                        <p className="text-xs text-stone-600">
+                            ส่งคำร้องขอไปยังช่างฝีมือ เพื่อสะกิดเตือนให้ช่วยอัปเดตภาพถ่ายหรือขั้นตอนการผลิตล่าสุดใน Crafting Journey Tracker ค่ะ
+                        </p>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-stone-700 block">
+                                ข้อความฝากถึงร้านค้า (Optional):
+                            </label>
+                            <textarea
+                                rows={3}
+                                placeholder="เช่น อยากสอบถามว่างานปั้นตอนนี้ดำเนินถึงไหนแล้วคะ..."
+                                value={buyerNoteText}
+                                onChange={(e) => setBuyerNoteText(e.target.value)}
+                                className="w-full text-xs p-3 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500 text-stone-800"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setUpdateModalOrder(null)}
+                                className="flex-1 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl transition-colors"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                type="button"
+                                disabled={updatingId === updateModalOrder.id}
+                                onClick={handleSendUpdateRequest}
+                                className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl shadow-md transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+                            >
+                                <Send className="w-3.5 h-3.5" />
+                                <span>{updatingId === updateModalOrder.id ? 'กำลังส่ง...' : 'ยืนยันส่งคำร้อง'}</span>
+                            </button>
                         </div>
                     </div>
                 </div>
